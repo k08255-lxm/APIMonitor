@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_pin_requested">请在系统提示中确认添加桌面小组件。</string>
+    <string name="widget_pin_not_supported">当前桌面不支持自动添加，请长按桌面后从“小组件”中添加 API 监测台。</string>
+</resources>

@@ -1,0 +1,436 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background"
+    android:baselineAligned="false"
+    android:orientation="vertical"
+    android:paddingLeft="10dp"
+    android:paddingTop="8dp"
+    android:paddingRight="10dp"
+    android:paddingBottom="8dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="34dp"
+        android:baselineAligned="false"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/widget_title"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:gravity="center_vertical"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:text="@string/widget_title"
+            android:textColor="@color/ink"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <ImageButton
+            android:id="@+id/widget_refresh"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:background="@drawable/widget_button"
+            android:contentDescription="@string/widget_refresh"
+            android:padding="7dp"
+            android:src="@drawable/ic_refresh" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="14dp"
+        android:baselineAligned="false"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/widget_status"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:gravity="center_vertical"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:text="@string/widget_status_loading"
+            android:textColor="@color/teal"
+            android:textSize="9sp" />
+
+        <TextView
+            android:id="@+id/widget_last_updated"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:gravity="center_vertical"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:text="@string/widget_not_updated"
+            android:textColor="@color/muted"
+            android:textSize="9sp" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/widget_loading"
+        android:layout_width="match_parent"
+        android:layout_height="14dp"
+        android:gravity="center_vertical"
+        android:includeFontPadding="false"
+        android:text="@string/widget_loading"
+        android:textColor="@color/muted"
+        android:textSize="9sp"
+        android:visibility="visible" />
+
+    <TextView
+        android:id="@+id/widget_error"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@drawable/widget_error_surface"
+        android:gravity="center"
+        android:paddingLeft="16dp"
+        android:paddingTop="16dp"
+        android:paddingRight="16dp"
+        android:paddingBottom="16dp"
+        android:text="@string/widget_error"
+        android:textAlignment="center"
+        android:textColor="@color/error"
+        android:textSize="12sp"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/widget_content"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:baselineAligned="false"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="42dp"
+            android:layout_marginTop="3dp"
+            android:background="@drawable/widget_primary"
+            android:baselineAligned="false"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingLeft="10dp"
+            android:paddingTop="4dp"
+            android:paddingRight="10dp"
+            android:paddingBottom="4dp">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="14dp"
+                    android:gravity="center_vertical"
+                    android:includeFontPadding="false"
+                    android:text="@string/widget_today_tokens"
+                    android:textColor="@color/muted"
+                    android:textSize="8sp" />
+
+                <TextView
+                    android:id="@+id/widget_tokens"
+                    android:layout_width="wrap_content"
+                    android:layout_height="20dp"
+                    android:gravity="center_vertical"
+                    android:includeFontPadding="false"
+                    android:maxLines="1"
+                    android:text="--"
+                    android:textColor="@color/ink"
+                    android:textSize="19sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:gravity="right"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="14dp"
+                    android:gravity="center_vertical"
+                    android:includeFontPadding="false"
+                    android:text="@string/widget_today_cost"
+                    android:textColor="@color/muted"
+                    android:textSize="8sp" />
+
+                <TextView
+                    android:id="@+id/widget_cost"
+                    android:layout_width="wrap_content"
+                    android:layout_height="20dp"
+                    android:gravity="center_vertical|right"
+                    android:includeFontPadding="false"
+                    android:maxLines="1"
+                    android:text="--"
+                    android:textColor="@color/green"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="29dp"
+            android:layout_marginTop="4dp"
+            android:baselineAligned="false"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="@drawable/widget_tile"
+                android:orientation="vertical"
+                android:paddingLeft="5dp"
+                android:paddingTop="2dp"
+                android:paddingRight="4dp"
+                android:paddingBottom="2dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="11dp" android:includeFontPadding="false" android:text="@string/widget_metric_requests" android:textColor="@color/muted" android:textSize="7sp" />
+                <TextView android:id="@+id/widget_requests" android:layout_width="wrap_content" android:layout_height="14dp" android:includeFontPadding="false" android:maxLines="1" android:text="--" android:textColor="@color/ink" android:textSize="11sp" android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginLeft="3dp"
+                android:layout_weight="1"
+                android:background="@drawable/widget_tile"
+                android:orientation="vertical"
+                android:paddingLeft="5dp"
+                android:paddingTop="2dp"
+                android:paddingRight="4dp"
+                android:paddingBottom="2dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="11dp" android:includeFontPadding="false" android:text="@string/widget_metric_success" android:textColor="@color/muted" android:textSize="7sp" />
+                <TextView android:id="@+id/widget_success" android:layout_width="wrap_content" android:layout_height="14dp" android:includeFontPadding="false" android:maxLines="1" android:text="--" android:textColor="@color/ink" android:textSize="11sp" android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginLeft="3dp"
+                android:layout_weight="1"
+                android:background="@drawable/widget_tile"
+                android:orientation="vertical"
+                android:paddingLeft="5dp"
+                android:paddingTop="2dp"
+                android:paddingRight="4dp"
+                android:paddingBottom="2dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="11dp" android:includeFontPadding="false" android:text="@string/widget_metric_latency" android:textColor="@color/muted" android:textSize="7sp" />
+                <TextView android:id="@+id/widget_latency" android:layout_width="wrap_content" android:layout_height="14dp" android:includeFontPadding="false" android:maxLines="1" android:text="--" android:textColor="@color/ink" android:textSize="11sp" android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginLeft="3dp"
+                android:layout_weight="1"
+                android:background="@drawable/widget_tile"
+                android:orientation="vertical"
+                android:paddingLeft="5dp"
+                android:paddingTop="2dp"
+                android:paddingRight="4dp"
+                android:paddingBottom="2dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="11dp" android:includeFontPadding="false" android:text="@string/widget_metric_rpm" android:textColor="@color/muted" android:textSize="7sp" />
+                <TextView android:id="@+id/widget_rpm" android:layout_width="wrap_content" android:layout_height="14dp" android:includeFontPadding="false" android:maxLines="1" android:text="--" android:textColor="@color/ink" android:textSize="11sp" android:textStyle="bold" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="29dp"
+            android:layout_marginTop="3dp"
+            android:baselineAligned="false"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="@drawable/widget_tile"
+                android:orientation="vertical"
+                android:paddingLeft="5dp"
+                android:paddingTop="2dp"
+                android:paddingRight="4dp"
+                android:paddingBottom="2dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="11dp" android:includeFontPadding="false" android:text="@string/widget_metric_tpm" android:textColor="@color/muted" android:textSize="7sp" />
+                <TextView android:id="@+id/widget_tpm" android:layout_width="wrap_content" android:layout_height="14dp" android:includeFontPadding="false" android:maxLines="1" android:text="--" android:textColor="@color/ink" android:textSize="11sp" android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginLeft="3dp"
+                android:layout_weight="1"
+                android:background="@drawable/widget_tile"
+                android:orientation="vertical"
+                android:paddingLeft="5dp"
+                android:paddingTop="2dp"
+                android:paddingRight="4dp"
+                android:paddingBottom="2dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="11dp" android:includeFontPadding="false" android:text="@string/widget_metric_service" android:textColor="@color/muted" android:textSize="7sp" />
+                <TextView android:id="@+id/widget_service" android:layout_width="wrap_content" android:layout_height="14dp" android:includeFontPadding="false" android:maxLines="1" android:text="--" android:textColor="@color/ink" android:textSize="11sp" android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginLeft="3dp"
+                android:layout_weight="1"
+                android:background="@drawable/widget_tile"
+                android:orientation="vertical"
+                android:paddingLeft="5dp"
+                android:paddingTop="2dp"
+                android:paddingRight="4dp"
+                android:paddingBottom="2dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="11dp" android:includeFontPadding="false" android:text="@string/widget_metric_keys" android:textColor="@color/muted" android:textSize="7sp" />
+                <TextView android:id="@+id/widget_keys" android:layout_width="wrap_content" android:layout_height="14dp" android:includeFontPadding="false" android:maxLines="1" android:text="--" android:textColor="@color/ink" android:textSize="11sp" android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginLeft="3dp"
+                android:layout_weight="1"
+                android:background="@drawable/widget_tile"
+                android:orientation="vertical"
+                android:paddingLeft="5dp"
+                android:paddingTop="2dp"
+                android:paddingRight="4dp"
+                android:paddingBottom="2dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="11dp" android:includeFontPadding="false" android:text="@string/widget_metric_cost_short" android:textColor="@color/muted" android:textSize="7sp" />
+                <TextView android:id="@+id/widget_cost_short" android:layout_width="wrap_content" android:layout_height="14dp" android:includeFontPadding="false" android:maxLines="1" android:text="--" android:textColor="@color/green" android:textSize="11sp" android:textStyle="bold" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:layout_marginTop="4dp"
+            android:baselineAligned="false"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="@drawable/widget_model_surface"
+                android:orientation="vertical"
+                android:paddingLeft="8dp"
+                android:paddingTop="3dp"
+                android:paddingRight="6dp"
+                android:paddingBottom="3dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="11dp" android:includeFontPadding="false" android:text="@string/widget_model_top" android:textColor="@color/teal" android:textSize="7sp" android:textStyle="bold" />
+                <TextView android:id="@+id/widget_model_name" android:layout_width="match_parent" android:layout_height="13dp" android:ellipsize="end" android:includeFontPadding="false" android:maxLines="1" android:text="--" android:textColor="@color/ink" android:textSize="10sp" android:textStyle="bold" />
+                <TextView android:id="@+id/widget_model_detail" android:layout_width="match_parent" android:layout_height="12dp" android:ellipsize="end" android:includeFontPadding="false" android:maxLines="1" android:text="--" android:textColor="@color/muted" android:textSize="8sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginLeft="3dp"
+                android:layout_weight="1"
+                android:background="@drawable/widget_tile"
+                android:orientation="vertical"
+                android:paddingLeft="8dp"
+                android:paddingTop="3dp"
+                android:paddingRight="6dp"
+                android:paddingBottom="3dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="11dp" android:includeFontPadding="false" android:text="@string/widget_lifetime_title" android:textColor="@color/muted" android:textSize="7sp" android:textStyle="bold" />
+                <LinearLayout android:layout_width="match_parent" android:layout_height="21dp" android:baselineAligned="false" android:gravity="center_vertical" android:orientation="horizontal">
+                    <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:orientation="vertical">
+                        <TextView android:layout_width="wrap_content" android:layout_height="9dp" android:includeFontPadding="false" android:text="@string/widget_lifetime_tokens_label" android:textColor="@color/muted" android:textSize="6sp" />
+                        <TextView android:id="@+id/widget_lifetime_tokens" android:layout_width="wrap_content" android:layout_height="12dp" android:includeFontPadding="false" android:maxLines="1" android:text="--" android:textColor="@color/ink" android:textSize="9sp" android:textStyle="bold" />
+                    </LinearLayout>
+                    <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:orientation="vertical">
+                        <TextView android:layout_width="wrap_content" android:layout_height="9dp" android:includeFontPadding="false" android:text="@string/widget_lifetime_requests_label" android:textColor="@color/muted" android:textSize="6sp" />
+                        <TextView android:id="@+id/widget_lifetime_requests" android:layout_width="wrap_content" android:layout_height="12dp" android:includeFontPadding="false" android:maxLines="1" android:text="--" android:textColor="@color/ink" android:textSize="9sp" android:textStyle="bold" />
+                    </LinearLayout>
+                    <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:orientation="vertical">
+                        <TextView android:layout_width="wrap_content" android:layout_height="9dp" android:includeFontPadding="false" android:text="@string/widget_lifetime_cost_label" android:textColor="@color/muted" android:textSize="6sp" />
+                        <TextView android:id="@+id/widget_lifetime_cost" android:layout_width="wrap_content" android:layout_height="12dp" android:includeFontPadding="false" android:maxLines="1" android:text="--" android:textColor="@color/green" android:textSize="9sp" android:textStyle="bold" />
+                    </LinearLayout>
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="16dp"
+            android:layout_marginTop="4dp"
+            android:gravity="center_vertical"
+            android:includeFontPadding="false"
+            android:text="@string/widget_recent_title"
+            android:textColor="@color/ink"
+            android:textSize="10sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/widget_recent_empty"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:text="@string/widget_no_recent"
+            android:textColor="@color/muted"
+            android:textSize="10sp"
+            android:visibility="visible" />
+
+        <LinearLayout
+            android:id="@+id/widget_recent_rows"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:baselineAligned="false"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <LinearLayout android:id="@+id/widget_recent_row_1" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:background="@drawable/widget_recent_compact" android:baselineAligned="false" android:gravity="center_vertical" android:orientation="horizontal" android:paddingLeft="6dp" android:paddingRight="6dp">
+                <TextView android:id="@+id/widget_recent_1_time" android:layout_width="40dp" android:layout_height="match_parent" android:gravity="center_vertical" android:includeFontPadding="false" android:maxLines="1" android:text="--" android:textColor="@color/muted" android:textSize="8sp" />
+                <TextView android:id="@+id/widget_recent_1_label" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:ellipsize="end" android:gravity="center_vertical" android:includeFontPadding="false" android:maxLines="1" android:text="--" android:textColor="@color/ink" android:textSize="8sp" android:textStyle="bold" />
+                <TextView android:id="@+id/widget_recent_1_detail" android:layout_width="43dp" android:layout_height="match_parent" android:gravity="center_vertical|right" android:includeFontPadding="false" android:maxLines="1" android:text="--" android:textColor="@color/muted" android:textSize="8sp" />
+                <TextView android:id="@+id/widget_recent_1_cost" android:layout_width="41dp" android:layout_height="match_parent" android:gravity="center_vertical|right" android:includeFontPadding="false" android:maxLines="1" android:text="--" android:textColor="@color/green" android:textSize="8sp" android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout android:id="@+id/widget_recent_row_2" android:layout_width="match_parent" android:layout_height="0dp" android:layout_marginTop="2dp" android:layout_weight="1" android:background="@drawable/widget_recent_compact" android:baselineAligned="false" android:gravity="center_vertical" android:orientation="horizontal" android:paddingLeft="6dp" android:paddingRight="6dp">
+                <TextView android:id="@+id/widget_recent_2_time" android:layout_width="40dp" android:layout_height="match_parent" android:gravity="center_vertical" android:includeFontPadding="false" android:maxLines="1" android:text="--" android:textColor="@color/muted" android:textSize="8sp" />
+                <TextView android:id="@+id/widget_recent_2_label" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:ellipsize="end" android:gravity="center_vertical" android:includeFontPadding="false" android:maxLines="1" android:text="--" android:textColor="@color/ink" android:textSize="8sp" android:textStyle="bold" />
+                <TextView android:id="@+id/widget_recent_2_detail" android:layout_width="43dp" android:layout_height="match_parent" android:gravity="center_vertical|right" android:includeFontPadding="false" android:maxLines="1" android:text="--" android:textColor="@color/muted" android:textSize="8sp" />
+                <TextView android:id="@+id/widget_recent_2_cost" android:layout_width="41dp" android:layout_height="match_parent" android:gravity="center_vertical|right" android:includeFontPadding="false" android:maxLines="1" android:text="--" android:textColor="@color/green" android:textSize="8sp" android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout android:id="@+id/widget_recent_row_3" android:layout_width="match_parent" android:layout_height="0dp" android:layout_marginTop="2dp" android:layout_weight="1" android:background="@drawable/widget_recent_compact" android:baselineAligned="false" android:gravity="center_vertical" android:orientation="horizontal" android:paddingLeft="6dp" android:paddingRight="6dp">
+                <TextView android:id="@+id/widget_recent_3_time" android:layout_width="40dp" android:layout_height="match_parent" android:gravity="center_vertical" android:includeFontPadding="false" android:maxLines="1" android:text="--" android:textColor="@color/muted" android:textSize="8sp" />
+                <TextView android:id="@+id/widget_recent_3_label" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:ellipsize="end" android:gravity="center_vertical" android:includeFontPadding="false" android:maxLines="1" android:text="--" android:textColor="@color/ink" android:textSize="8sp" android:textStyle="bold" />
+                <TextView android:id="@+id/widget_recent_3_detail" android:layout_width="43dp" android:layout_height="match_parent" android:gravity="center_vertical|right" android:includeFontPadding="false" android:maxLines="1" android:text="--" android:textColor="@color/muted" android:textSize="8sp" />
+                <TextView android:id="@+id/widget_recent_3_cost" android:layout_width="41dp" android:layout_height="match_parent" android:layout_gravity="center_vertical" android:gravity="center_vertical|right" android:includeFontPadding="false" android:maxLines="1" android:text="--" android:textColor="@color/green" android:textSize="8sp" android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout android:id="@+id/widget_recent_row_4" android:layout_width="match_parent" android:layout_height="0dp" android:layout_marginTop="2dp" android:layout_weight="1" android:background="@drawable/widget_recent_compact" android:baselineAligned="false" android:gravity="center_vertical" android:orientation="horizontal" android:paddingLeft="6dp" android:paddingRight="6dp">
+                <TextView android:id="@+id/widget_recent_4_time" android:layout_width="40dp" android:layout_height="match_parent" android:gravity="center_vertical" android:includeFontPadding="false" android:maxLines="1" android:text="--" android:textColor="@color/muted" android:textSize="8sp" />
+                <TextView android:id="@+id/widget_recent_4_label" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:ellipsize="end" android:gravity="center_vertical" android:includeFontPadding="false" android:maxLines="1" android:text="--" android:textColor="@color/ink" android:textSize="8sp" android:textStyle="bold" />
+                <TextView android:id="@+id/widget_recent_4_detail" android:layout_width="43dp" android:layout_height="match_parent" android:gravity="center_vertical|right" android:includeFontPadding="false" android:maxLines="1" android:text="--" android:textColor="@color/muted" android:textSize="8sp" />
+                <TextView android:id="@+id/widget_recent_4_cost" android:layout_width="41dp" android:layout_height="match_parent" android:gravity="center_vertical|right" android:includeFontPadding="false" android:maxLines="1" android:text="--" android:textColor="@color/green" android:textSize="8sp" android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout android:id="@+id/widget_recent_row_5" android:layout_width="match_parent" android:layout_height="0dp" android:layout_marginTop="2dp" android:layout_weight="1" android:background="@drawable/widget_recent_compact" android:baselineAligned="false" android:gravity="center_vertical" android:orientation="horizontal" android:paddingLeft="6dp" android:paddingRight="6dp">
+                <TextView android:id="@+id/widget_recent_5_time" android:layout_width="40dp" android:layout_height="match_parent" android:gravity="center_vertical" android:includeFontPadding="false" android:maxLines="1" android:text="--" android:textColor="@color/muted" android:textSize="8sp" />
+                <TextView android:id="@+id/widget_recent_5_label" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:ellipsize="end" android:gravity="center_vertical" android:includeFontPadding="false" android:maxLines="1" android:text="--" android:textColor="@color/ink" android:textSize="8sp" android:textStyle="bold" />
+                <TextView android:id="@+id/widget_recent_5_detail" android:layout_width="43dp" android:layout_height="match_parent" android:gravity="center_vertical|right" android:includeFontPadding="false" android:maxLines="1" android:text="--" android:textColor="@color/muted" android:textSize="8sp" />
+                <TextView android:id="@+id/widget_recent_5_cost" android:layout_width="41dp" android:layout_height="match_parent" android:gravity="center_vertical|right" android:includeFontPadding="false" android:maxLines="1" android:text="--" android:textColor="@color/green" android:textSize="8sp" android:textStyle="bold" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

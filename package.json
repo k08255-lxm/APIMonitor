@@ -1,0 +1,17 @@
+{
+  "name": "api-monitor-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Mobile-first API usage monitor for Sub2API, cc-switch, and OpenAI-compatible traffic.",
+  "engines": {
+    "node": ">=22.5"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.mjs",
+    "dev": "node --env-file-if-exists=.env --watch server.mjs",
+    "demo": "node --env-file-if-exists=.env scripts/seed-demo.mjs",
+    "test": "node --test",
+    "check": "node --check server.mjs && node --check public/app.js && node --test"
+  }
+}

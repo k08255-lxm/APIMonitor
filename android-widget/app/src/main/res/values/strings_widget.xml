@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_status_loading">同步中</string>
+    <string name="widget_status_needs_setup">等待在 App 中完成配置</string>
+    <string name="widget_status_error">连接异常</string>
+    <string name="widget_status_service">服务 %1$s</string>
+    <string name="widget_not_updated">尚未成功同步</string>
+    <string name="widget_last_updated_format">更新 %1$s</string>
+    <string name="widget_previous_updated_format">上次更新 %1$s</string>
+    <string name="widget_today_tokens">今日 Tokens</string>
+    <string name="widget_today_cost">今日成本</string>
+    <string name="widget_metric_requests">请求</string>
+    <string name="widget_metric_success">成功率</string>
+    <string name="widget_metric_latency">延迟</string>
+    <string name="widget_metric_rpm">RPM</string>
+    <string name="widget_metric_tpm">TPM</string>
+    <string name="widget_metric_service">服务</string>
+    <string name="widget_metric_keys">活跃 Key</string>
+    <string name="widget_metric_cost_short">成本</string>
+    <string name="widget_model_top">模型 TOP</string>
+    <string name="widget_model_detail_format">%1$s Token · %2$s</string>
+    <string name="widget_lifetime_title">累计总览</string>
+    <string name="widget_lifetime_tokens_label">Token</string>
+    <string name="widget_lifetime_requests_label">请求</string>
+    <string name="widget_lifetime_cost_label">成本</string>
+    <string name="widget_recent_title">最近调用 · 最多 5 条</string>
+    <string name="widget_recent_label_format">%1$s · %2$s</string>
+    <string name="widget_recent_detail_format">%1$s / %2$s</string>
+</resources>

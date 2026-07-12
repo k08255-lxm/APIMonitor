@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0b746b">
+    <meta name="color-scheme" content="light">
+    <meta name="description" content="面向移动设备的 API 用量与服务状态监测台">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="API 监测">
+    <title>API 监测台</title>
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icon.svg">
+    <link rel="stylesheet" href="/styles.css?v=5">
+    <script src="/app.js?v=7" defer></script>
+  </head>
+  <body class="initial-loading">
+    <a class="skip-link" href="#main-content">跳到主要内容</a>
+
+    <div class="app-shell">
+      <header class="app-header">
+        <div class="brand-block">
+          <div class="brand-mark" aria-hidden="true">
+            <span></span><span></span><span></span>
+          </div>
+          <div class="brand-copy">
+            <p>移动监控</p>
+            <h1>API 监测台</h1>
+          </div>
+        </div>
+
+        <div class="header-actions">
+          <button id="settings-button" class="icon-button" type="button" aria-label="数据源设置" title="数据源设置">
+            <span class="settings-glyph" aria-hidden="true">⚙</span>
+          </button>
+          <button id="install-button" class="icon-button" type="button" aria-label="安装应用" title="安装应用" hidden>
+            <span aria-hidden="true">↓</span>
+          </button>
+          <button id="refresh-button" class="icon-button" type="button" aria-label="刷新数据" title="刷新数据">
+            <span class="refresh-glyph" aria-hidden="true">↻</span>
+          </button>
+        </div>
+      </header>
+
+      <div class="context-row">
+        <div id="connection-status" class="connection-pill" data-state="connecting" role="status" aria-live="polite">
+          <span class="connection-dot" aria-hidden="true"></span>
+          <span id="connection-label">正在连接</span>
+        </div>
+        <p id="updated-at">等待首次同步</p>
+      </div>
+      <section class="backend-strip" aria-labelledby="backend-title">
+        <div id="backend-state" class="backend-state" data-state="loading" role="status" aria-live="polite">
+          <span class="backend-dot" aria-hidden="true"></span>
+          <div>
+            <h2 id="backend-title">后端服务</h2>
+            <p id="backend-detail">正在读取运行状态...</p>
+          </div>
+        </div>
+        <div id="backend-actions" class="backend-actions" data-busy="false">
+          <button id="backend-restart" class="icon-button" type="button" aria-label="重启后端服务" title="重启后端服务" disabled>
+            <span class="refresh-glyph" aria-hidden="true">↻</span>
+          </button>
+          <button id="backend-stop" class="icon-button backend-stop" type="button" aria-label="关闭后端服务" title="关闭后端服务" disabled>
+            <span aria-hidden="true">■</span>
+          </button>
+        </div>
+      </section>
+      <div class="source-toolbar">
+        <label class="source-control" for="source-select">
+          <span>统计来源</span>
+          <select id="source-select" aria-label="选择统计来源">
+            <option value="auto">自动选择</option>
+            <option value="local">本机代理</option>
+            <option value="sub2api">Sub2API</option>
+            <option value="cc-switch">cc-switch</option>
+            <option value="all">全部相加</option>
+          </select>
+        </label>
+        <div id="source-strip" class="source-strip" aria-label="数据来源状态" hidden></div>
+      </div>
+
+      <nav class="range-switch" aria-label="监测时间范围">
+        <button type="button" data-range="today" aria-pressed="true">今日</button>
+        <button type="button" data-range="24h" aria-pressed="false">24 小时</button>
+        <button type="button" data-range="7d" aria-pressed="false">7 天</button>
+      </nav>
+
+      <main id="main-content" aria-busy="true">
+        <section id="state-panel" class="state-panel" data-tone="loading" role="status" aria-live="polite">
+          <span id="state-icon" class="state-icon" aria-hidden="true">···</span>
+          <div>
+            <h2 id="state-title">正在读取监测数据</h2>
+            <p id="state-message">首次同步可能需要片刻。</p>
+          </div>
+          <button id="retry-button" class="text-button" type="button" hidden>重试</button>
+        </section>
+
+        <section class="overview" aria-labelledby="overview-title">
+          <h2 id="overview-title" class="visually-hidden">用量概览</h2>
+
+          <article class="token-hero">
+            <div class="hero-heading">
+              <div>
+                <p id="token-range-label" class="eyebrow">今日 Token</p>
+                <p id="token-value" class="hero-value" data-value>--</p>
+              </div>
+              <span class="metric-badge token-badge" aria-hidden="true">T</span>
+            </div>
+            <div class="hero-footer">
+              <div>
+                <span id="cost-range-label">今日成本</span>
+                <strong id="cost-value" data-value>--</strong>
+              </div>
+              <div class="hero-accent" aria-hidden="true"><span></span></div>
+            </div>
+          </article>
+
+          <div class="metric-grid">
+            <article class="metric-card accent-blue">
+              <div class="metric-label"><span class="metric-badge" aria-hidden="true">R</span><span>请求</span></div>
+              <strong id="requests-value" data-value>--</strong>
+              <small id="requests-note">当前范围</small>
+            </article>
+            <article class="metric-card accent-amber">
+              <div class="metric-label"><span class="metric-badge" aria-hidden="true">ms</span><span>平均响应</span></div>
+              <strong id="latency-value" data-value>--</strong>
+              <small>端到端</small>
+            </article>
+            <article class="metric-card accent-teal">
+              <div class="metric-label"><span class="metric-badge" aria-hidden="true">R</span><span>RPM</span></div>
+              <strong id="rpm-value" data-value>--</strong>
+              <small>每分钟请求</small>
+            </article>
+            <article class="metric-card accent-violet">
+              <div class="metric-label"><span class="metric-badge" aria-hidden="true">T</span><span>TPM</span></div>
+              <strong id="tpm-value" data-value>--</strong>
+              <small>每分钟 Token</small>
+            </article>
+            <article class="metric-card accent-green">
+              <div class="metric-label"><span class="metric-badge" aria-hidden="true">%</span><span>成功率</span></div>
+              <strong id="success-value" data-value>--</strong>
+              <small id="success-note">暂无数据</small>
+            </article>
+            <article class="metric-card accent-coral">
+              <div class="metric-label"><span class="metric-badge" aria-hidden="true">S</span><span>服务状态</span></div>
+              <strong id="services-value" data-value>--</strong>
+              <small id="services-note">暂无数据</small>
+            </article>
+            <article class="metric-card accent-cyan key-card">
+              <div class="metric-label"><span class="metric-badge" aria-hidden="true">K</span><span>活跃 Key</span></div>
+              <strong id="keys-value" data-value>--</strong>
+              <small>当前活跃</small>
+            </article>
+          </div>
+        </section>
+
+        <div class="detail-grid">
+          <section class="panel recent-panel" aria-labelledby="recent-title">
+            <div class="panel-heading">
+              <div>
+                <h2 id="recent-title">最近调用</h2>
+                <p id="recent-subtitle">等待数据</p>
+              </div>
+              <span id="recent-count" class="count-label">0 条</span>
+            </div>
+            <ul id="recent-list" class="recent-list" aria-live="polite">
+              <li class="list-placeholder">正在读取调用记录...</li>
+            </ul>
+          </section>
+
+          <div class="side-stack">
+            <section class="panel trend-panel" aria-labelledby="trend-title">
+              <div class="panel-heading chart-heading">
+                <div>
+                  <h2 id="trend-title">用量趋势</h2>
+                  <p id="trend-subtitle">当前范围</p>
+                </div>
+                <div class="chart-switch" role="group" aria-label="趋势指标">
+                  <button type="button" data-chart-mode="tokens" aria-pressed="true">Token</button>
+                  <button type="button" data-chart-mode="requests" aria-pressed="false">请求</button>
+                </div>
+              </div>
+              <div class="chart-wrap">
+                <canvas id="trend-canvas" role="slider" tabindex="0" aria-label="用量趋势图" aria-describedby="chart-detail">当前浏览器不支持趋势图。</canvas>
+              </div>
+              <p id="chart-detail" class="chart-detail" aria-live="polite">正在读取趋势明细...</p>
+              <div class="chart-meta">
+                <span id="chart-peak">峰值 --</span>
+                <span id="chart-total">合计 --</span>
+              </div>
+            </section>
+
+            <section class="panel models-panel" aria-labelledby="models-title">
+              <div class="panel-heading">
+                <div>
+                  <h2 id="models-title">模型排行</h2>
+                  <p>按 Token 用量</p>
+                </div>
+                <span class="count-label">TOP 4</span>
+              </div>
+              <ol id="models-list" class="models-list" aria-live="polite">
+                <li class="list-placeholder">正在读取模型数据...</li>
+              </ol>
+            </section>
+          </div>
+        </div>
+
+        <section class="lifetime-strip" aria-labelledby="lifetime-title">
+          <div class="lifetime-title-block">
+            <span class="metric-badge" aria-hidden="true">Σ</span>
+            <h2 id="lifetime-title">累计总览</h2>
+          </div>
+          <dl>
+            <div>
+              <dt>Tokens</dt>
+              <dd id="lifetime-tokens" data-value>--</dd>
+            </div>
+            <div>
+              <dt>请求</dt>
+              <dd id="lifetime-requests" data-value>--</dd>
+            </div>
+            <div>
+              <dt>成本</dt>
+              <dd id="lifetime-cost" data-value>--</dd>
+            </div>
+          </dl>
+        </section>
+      </main>
+
+      <footer class="app-footer">
+        <span>API Monitor</span>
+        <span id="footer-status">等待连接</span>
+      </footer>
+    </div>
+
+    <dialog id="settings-dialog" class="settings-dialog" aria-labelledby="settings-title">
+      <form id="settings-form" class="settings-form" autocomplete="off">
+        <header class="settings-header">
+          <div>
+            <p>本机配置</p>
+            <h2 id="settings-title">数据源设置</h2>
+          </div>
+          <button id="settings-close" class="dialog-close" type="button" aria-label="关闭设置" title="关闭设置">
+            <span aria-hidden="true">×</span>
+          </button>
+        </header>
+
+        <div class="settings-body">
+          <section class="settings-section" aria-labelledby="sub2api-settings-title">
+            <div class="settings-section-heading">
+              <div>
+                <h3 id="sub2api-settings-title">Sub2API</h3>
+                <p id="sub2api-config-state">未启用</p>
+              </div>
+              <label class="switch-control">
+                <span>启用</span>
+                <input id="sub2api-enabled" type="checkbox" role="switch">
+                <span class="switch-track" aria-hidden="true"></span>
+              </label>
+            </div>
+
+            <div id="sub2api-fields" class="settings-fields" hidden>
+              <label class="form-field" for="sub2api-base-url">
+                <span>服务地址</span>
+                <input id="sub2api-base-url" name="sub2apiBaseUrl" type="url" inputmode="url" placeholder="https://sub2api.example.com" maxlength="2048">
+              </label>
+
+              <fieldset class="scope-field">
+                <legend>凭据类型</legend>
+                <div class="segmented-control">
+                  <label>
+                    <input type="radio" name="sub2apiScope" value="admin" checked>
+                    <span>管理员 Key</span>
+                  </label>
+                  <label>
+                    <input type="radio" name="sub2apiScope" value="user">
+                    <span>用户 JWT</span>
+                  </label>
+                </div>
+              </fieldset>
+
+              <div id="admin-credential-fields" class="credential-fields">
+                <label class="form-field" for="sub2api-admin-key">
+                  <span>管理员 Key</span>
+                  <input id="sub2api-admin-key" name="sub2apiAdminKey" type="password" autocomplete="new-password" maxlength="8192">
+                  <small id="admin-key-state">未配置</small>
+                </label>
+                <label id="clear-admin-row" class="check-row" hidden>
+                  <input id="clear-admin-key" type="checkbox">
+                  <span>清除已保存的管理员 Key</span>
+                </label>
+              </div>
+
+              <div id="user-credential-fields" class="credential-fields" hidden>
+                <label class="form-field" for="sub2api-token">
+                  <span>用户 JWT</span>
+                  <input id="sub2api-token" name="sub2apiToken" type="password" autocomplete="new-password" maxlength="8192">
+                  <small id="user-token-state">未配置</small>
+                </label>
+                <label id="clear-token-row" class="check-row" hidden>
+                  <input id="clear-token" type="checkbox">
+                  <span>清除已保存的用户 JWT</span>
+                </label>
+              </div>
+
+              <label class="form-field" for="sub2api-timezone">
+                <span>统计时区</span>
+                <input id="sub2api-timezone" name="sub2apiTimezone" type="text" placeholder="Asia/Hong_Kong" maxlength="80">
+              </label>
+            </div>
+          </section>
+
+          <section class="settings-section" aria-labelledby="cc-switch-settings-title">
+            <div class="settings-section-heading">
+              <div>
+                <h3 id="cc-switch-settings-title">cc-switch</h3>
+                <p id="cc-switch-config-state">自动检测</p>
+              </div>
+              <label class="switch-control">
+                <span>启用</span>
+                <input id="cc-switch-enabled" type="checkbox" role="switch">
+                <span class="switch-track" aria-hidden="true"></span>
+              </label>
+            </div>
+
+            <div id="cc-switch-fields" class="settings-fields">
+              <label class="form-field" for="cc-switch-db-path">
+                <span>数据库路径</span>
+                <input id="cc-switch-db-path" name="ccSwitchDbPath" type="text" placeholder="留空自动检测 ~/.cc-switch/cc-switch.db" maxlength="4096">
+                <small>自定义路径仅在这台服务端电脑上生效</small>
+              </label>
+            </div>
+          </section>
+
+          <p id="settings-status" class="settings-status" role="status" aria-live="polite" hidden></p>
+        </div>
+
+        <footer class="settings-actions">
+          <button id="settings-cancel" class="secondary-button" type="button">取消</button>
+          <button id="settings-save" class="primary-button" type="submit">保存并应用</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  </body>
+</html>

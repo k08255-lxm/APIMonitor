@@ -1,0 +1,10 @@
+.env
+data/
+coverage/
+android-widget/.gradle/
+android-widget/.tooling/
+android-widget/app/build/
+android-widget/local.properties
+*.log
+.DS_Store
+Thumbs.db

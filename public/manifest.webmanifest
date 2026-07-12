@@ -1,0 +1,24 @@
+{
+  "id": "/",
+  "name": "API 监测台",
+  "short_name": "API 监测",
+  "description": "面向移动设备的 API 用量与服务状态监测台",
+  "lang": "zh-CN",
+  "dir": "ltr",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "prefer_related_applications": false,
+  "background_color": "#edf2f2",
+  "theme_color": "#0b746b",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

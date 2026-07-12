@@ -1,0 +1,79 @@
+plugins {
+    id 'com.android.application'
+}
+
+def signingPropertiesFile = rootProject.file('local-signing.properties')
+def signingProperties = new Properties()
+if (signingPropertiesFile.isFile()) {
+    signingPropertiesFile.withInputStream { signingProperties.load(it) }
+}
+
+def signingFields = ['storeFile', 'storePassword', 'keyAlias', 'keyPassword']
+def missingSigningFields = signingFields.findAll { !signingProperties.getProperty(it)?.trim() }
+def releaseSigningConfigured = signingPropertiesFile.isFile() && missingSigningFields.isEmpty()
+
+if (signingPropertiesFile.isFile() && !releaseSigningConfigured) {
+    throw new GradleException(
+        "${signingPropertiesFile.name} is missing: ${missingSigningFields.join(', ')}"
+    )
+}
+
+android {
+    namespace 'com.apimonitor.widget'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.apimonitor.widget'
+        minSdk 26
+        targetSdk 35
+        versionCode 3
+        versionName '1.2.0'
+    }
+
+    signingConfigs {
+        release {
+            if (releaseSigningConfigured) {
+                storeFile rootProject.file(signingProperties.getProperty('storeFile'))
+                storePassword signingProperties.getProperty('storePassword')
+                keyAlias signingProperties.getProperty('keyAlias')
+                keyPassword signingProperties.getProperty('keyPassword')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            if (releaseSigningConfigured) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    buildFeatures {
+        buildConfig false
+    }
+}
+
+dependencies {
+    implementation 'androidx.activity:activity:1.9.1'
+    implementation 'androidx.core:core:1.13.1'
+    implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
+    implementation 'com.google.android.material:material:1.12.0'
+}
+
+tasks.configureEach {
+    if (name == 'validateSigningRelease' && !releaseSigningConfigured) {
+        doFirst {
+            throw new GradleException(
+                'Release signing is not configured. Run the project-root '
+                    + '\u6784\u5efa\u5b89\u5353\u5c0f\u7ec4\u4ef6.cmd launcher, or create android-widget/local-signing.properties '
+                    + 'from signing.properties.example. See android-widget/SIGNING.md.'
+            )
+        }
+    }
+}

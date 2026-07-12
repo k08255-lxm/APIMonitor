@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="API 监测台">
+  <rect width="512" height="512" rx="92" fill="#0b746b"/>
+  <rect x="112" y="126" width="288" height="56" rx="20" fill="#ffffff"/>
+  <rect x="112" y="228" width="204" height="56" rx="20" fill="#ffffff"/>
+  <rect x="112" y="330" width="120" height="56" rx="20" fill="#ffffff"/>
+  <circle cx="370" cy="358" r="30" fill="#9ad9cc"/>
+</svg>

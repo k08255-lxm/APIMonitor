@@ -1,0 +1,7 @@
+# Copy this file to local-signing.properties only when building manually.
+# The one-click Windows builder creates local-signing.properties automatically.
+# Do not commit local-signing.properties or the keystore it references.
+storeFile=C:/Users/you/AppData/Local/APIMonitor/android-signing/api-monitor-widget.jks
+storePassword=replace-with-your-private-store-password
+keyAlias=apimonitorwidget
+keyPassword=replace-with-your-private-key-password
