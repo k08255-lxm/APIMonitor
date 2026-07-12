@@ -25,8 +25,11 @@ public final class DashboardClient {
     private static final int READ_TIMEOUT_MS = 5_000;
     private static final long REQUEST_DEADLINE_MS = 7_000L;
     private static final int MAX_RESPONSE_BYTES = 512 * 1024;
-    private static final int MAX_RECENT = 5;
-    private static final int MAX_MODELS = 5;
+    // The widget is intentionally concise, while the full dashboard can inspect more history.
+    private static final int MAX_WIDGET_RECENT = 5;
+    private static final int MAX_DASHBOARD_RECENT = 50;
+    private static final int MAX_WIDGET_MODELS = 5;
+    private static final int MAX_DASHBOARD_MODELS = 12;
 
     private DashboardClient() {
     }
@@ -34,16 +37,27 @@ public final class DashboardClient {
     /** Compatibility entry point used by the home-screen widget. */
     static Snapshot fetch(WidgetPrefs.Config config) throws IOException {
         if (config == null || !config.isConfigured()) throw new IOException("Widget is not configured");
-        return fetch(config.baseUrl, config.password, "today", "auto");
+        return fetch(config.baseUrl, config.password, "today", "auto", MAX_WIDGET_RECENT, MAX_WIDGET_MODELS);
     }
 
     static Snapshot fetch(DashboardPrefs.Config config, String range, String source) throws IOException {
         if (config == null || !config.isConfigured()) throw new IOException("Dashboard is not configured");
-        return fetch(config.baseUrl, config.password, range, source);
+        return fetch(config.baseUrl, config.password, range, source, MAX_DASHBOARD_RECENT, MAX_DASHBOARD_MODELS);
     }
 
     /** Public form for code that already owns a validated monitor origin. */
     public static Snapshot fetch(String baseUrl, String password, String range, String source) throws IOException {
+        return fetch(baseUrl, password, range, source, MAX_DASHBOARD_RECENT, MAX_DASHBOARD_MODELS);
+    }
+
+    private static Snapshot fetch(
+            String baseUrl,
+            String password,
+            String range,
+            String source,
+            int maxRecent,
+            int maxModels
+    ) throws IOException {
         if (baseUrl == null || baseUrl.trim().isEmpty()) throw new IOException("Dashboard is not configured");
         String safeRange = DashboardPrefs.validRange(range) ? range : "today";
         String safeSource = DashboardPrefs.validSource(source) ? source : "auto";
@@ -74,7 +88,7 @@ public final class DashboardClient {
             }
             try (InputStream input = connection.getInputStream()) {
                 String body = readLimited(input, deadlineNanos);
-                return Snapshot.fromJson(new JSONObject(body));
+                return Snapshot.fromJson(new JSONObject(body), maxRecent, maxModels);
             } catch (org.json.JSONException error) {
                 throw new IOException("Dashboard response was not valid JSON", error);
             }
@@ -134,6 +148,69 @@ public final class DashboardClient {
             }
             if (responseCode != HttpURLConnection.HTTP_ACCEPTED) {
                 throw new IOException("Backend control returned HTTP " + responseCode);
+            }
+        } finally {
+            connection.disconnect();
+        }
+    }
+
+    static AutostartStatus fetchAutostart(DashboardPrefs.Config config) throws IOException {
+        if (config == null || !config.isConfigured()) throw new IOException("Dashboard is not configured");
+        URL endpoint = new URL(config.baseUrl + "/api/autostart");
+        HttpURLConnection connection = openJsonConnection(endpoint, "GET", config.password);
+        long deadlineNanos = System.nanoTime() + REQUEST_DEADLINE_MS * 1_000_000L;
+        try {
+            int responseCode = connection.getResponseCode();
+            if (System.nanoTime() - deadlineNanos >= 0) {
+                throw new SocketTimeoutException("Autostart status request timed out");
+            }
+            if (responseCode < 200 || responseCode >= 300) {
+                throw new IOException("Autostart returned HTTP " + responseCode);
+            }
+            try (InputStream input = connection.getInputStream()) {
+                return AutostartStatus.fromJson(new JSONObject(readLimited(input, deadlineNanos)));
+            } catch (org.json.JSONException error) {
+                throw new IOException("Autostart response was not valid JSON", error);
+            }
+        } finally {
+            connection.disconnect();
+        }
+    }
+
+    static AutostartStatus updateAutostart(
+            DashboardPrefs.Config config,
+            boolean enabled,
+            String mode
+    ) throws IOException {
+        if (config == null || !config.isConfigured()) throw new IOException("Dashboard is not configured");
+        if (!"always".equals(mode) && !"cc-switch".equals(mode)) {
+            throw new IOException("Unsupported autostart mode");
+        }
+
+        URL endpoint = new URL(config.baseUrl + "/api/autostart");
+        HttpURLConnection connection = openJsonConnection(endpoint, "PUT", config.password);
+        String requestedMode = enabled ? mode : "off";
+        byte[] requestBody = ("{\"mode\":\"" + requestedMode + "\"}")
+                .getBytes(StandardCharsets.UTF_8);
+        connection.setDoOutput(true);
+        connection.setFixedLengthStreamingMode(requestBody.length);
+        connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+        long deadlineNanos = System.nanoTime() + REQUEST_DEADLINE_MS * 1_000_000L;
+        try {
+            try (OutputStream output = connection.getOutputStream()) {
+                output.write(requestBody);
+            }
+            int responseCode = connection.getResponseCode();
+            if (System.nanoTime() - deadlineNanos >= 0) {
+                throw new SocketTimeoutException("Autostart update timed out");
+            }
+            if (responseCode < 200 || responseCode >= 300) {
+                throw new IOException("Autostart update returned HTTP " + responseCode);
+            }
+            try (InputStream input = connection.getInputStream()) {
+                return AutostartStatus.fromJson(new JSONObject(readLimited(input, deadlineNanos)));
+            } catch (org.json.JSONException error) {
+                throw new IOException("Autostart update response was not valid JSON", error);
             }
         } finally {
             connection.disconnect();
@@ -220,7 +297,7 @@ public final class DashboardClient {
             this.timeline = Collections.unmodifiableList(new ArrayList<>(timeline));
         }
 
-        static Snapshot fromJson(JSONObject root) {
+        static Snapshot fromJson(JSONObject root, int maxRecent, int maxModels) {
             JSONObject summary = root.optJSONObject("summary");
             if (summary == null) summary = new JSONObject();
             JSONObject lifetime = root.optJSONObject("lifetime");
@@ -229,7 +306,7 @@ public final class DashboardClient {
             List<Recent> recent = new ArrayList<>();
             JSONArray recentArray = root.optJSONArray("recent");
             if (recentArray != null) {
-                for (int index = 0; index < Math.min(recentArray.length(), MAX_RECENT); index++) {
+                for (int index = 0; index < Math.min(recentArray.length(), Math.max(0, maxRecent)); index++) {
                     JSONObject row = recentArray.optJSONObject(index);
                     if (row != null) recent.add(Recent.fromJson(row));
                 }
@@ -238,7 +315,7 @@ public final class DashboardClient {
             List<Model> models = new ArrayList<>();
             JSONArray modelArray = root.optJSONArray("models");
             if (modelArray != null) {
-                for (int index = 0; index < Math.min(modelArray.length(), MAX_MODELS); index++) {
+                for (int index = 0; index < Math.min(modelArray.length(), Math.max(0, maxModels)); index++) {
                     JSONObject row = modelArray.optJSONObject(index);
                     if (row != null) models.add(Model.fromJson(row));
                 }
@@ -279,6 +356,8 @@ public final class DashboardClient {
 
     static final class BackendStatus {
         final String status;
+        final String instanceId;
+        final String processId;
         final String bindHost;
         final long port;
         final String startedAt;
@@ -286,9 +365,12 @@ public final class DashboardClient {
         final boolean controlsEnabled;
         final List<String> availableActions;
 
-        BackendStatus(String status, String bindHost, long port, String startedAt, long uptimeSeconds,
+        BackendStatus(String status, String instanceId, String processId, String bindHost, long port,
+                      String startedAt, long uptimeSeconds,
                       boolean controlsEnabled, List<String> availableActions) {
             this.status = "stopping".equals(status) ? "stopping" : "running";
+            this.instanceId = instanceId;
+            this.processId = processId;
             this.bindHost = bindHost;
             this.port = port;
             this.startedAt = startedAt;
@@ -320,12 +402,38 @@ public final class DashboardClient {
             }
             return new BackendStatus(
                     firstString(root, "status"),
+                    firstString(root, "instanceId"),
+                    firstString(root, "processId", "pid"),
                     firstString(root, "bindHost"),
                     nonNegativeLong(root, "port"),
                     firstString(root, "startedAt"),
                     nonNegativeLong(root, "uptimeSeconds"),
                     booleanValue(control, "enabled", false),
                     actions
+            );
+        }
+    }
+
+    static final class AutostartStatus {
+        final boolean supported;
+        final boolean enabled;
+        final String mode;
+        final String detail;
+
+        AutostartStatus(boolean supported, boolean enabled, String mode, String detail) {
+            this.supported = supported;
+            this.enabled = enabled;
+            this.mode = "cc-switch".equals(mode) ? "cc-switch" : "always";
+            this.detail = detail == null ? "" : detail;
+        }
+
+        static AutostartStatus fromJson(JSONObject root) {
+            boolean hasEnabled = root.has("enabled");
+            return new AutostartStatus(
+                    booleanValue(root, "supported", hasEnabled),
+                    booleanValue(root, "enabled", false),
+                    firstString(root, "mode"),
+                    firstString(root, "detail", "message", "status")
             );
         }
     }

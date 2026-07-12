@@ -3,6 +3,7 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- HTTP is permitted only so a trusted private-LAN monitor can be used.
          EndpointValidator rejects public cleartext hosts; HTTPS remains preferred. -->
@@ -25,6 +26,21 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".BackendManagementActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.apk-files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/apk_file_paths" />
+        </provider>
 
         <!-- The system can update this explicit receiver; apps outside this package cannot. -->
         <receiver

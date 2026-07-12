@@ -39,6 +39,8 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -56,6 +58,7 @@ public final class MainActivity extends ComponentActivity {
     private MaterialButtonToggleGroup rangeGroup;
     private MaterialButtonToggleGroup sourceGroup;
     private MaterialButtonToggleGroup trendGroup;
+    private MaterialButtonToggleGroup trendRangeGroup;
     private LinearLayout dashboardData;
     private View emptyState;
     private TextView emptyTitle;
@@ -66,8 +69,8 @@ public final class MainActivity extends ComponentActivity {
     private View connectionDot;
     private View backendDot;
     private TextView backendDetailText;
-    private MaterialButton backendRestartButton;
-    private MaterialButton backendStopButton;
+    private MaterialButton backendManageButton;
+    private MaterialButton updateButton;
     private TextView tokensText;
     private TextView costText;
     private TextView requestsText;
@@ -82,7 +85,7 @@ public final class MainActivity extends ComponentActivity {
     private TextView lifetimeCostText;
     private TextView recentSubtitle;
     private LinearLayout recentList;
-    private LinearLayout modelsList;
+    private ModelBarChartView modelsChart;
     private TrendChartView trendChart;
     private TextView trendDetailText;
     private TextView trendPeakText;
@@ -91,15 +94,17 @@ public final class MainActivity extends ComponentActivity {
     private AlertDialog settingsDialog;
     private String selectedRange = "today";
     private String selectedSource = "auto";
+    private String trendWindow = "all";
     private boolean trendRequests;
+    private boolean preciseNumbers;
     private boolean loading;
     private int requestSequence;
     private int emptyStateMode = STATE_LOADING;
     private boolean configurationRequest;
     private int widgetId = AppWidgetManager.INVALID_APPWIDGET_ID;
     private DashboardClient.Snapshot lastSnapshot;
-    private DashboardClient.BackendStatus backendStatus;
-    private boolean backendActionInFlight;
+    private UpdateClient.Request updateRequest;
+    private boolean updateInFlight;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -112,9 +117,13 @@ public final class MainActivity extends ComponentActivity {
         DashboardPrefs.Config config = DashboardPrefs.load(this);
         selectedRange = config.range;
         selectedSource = config.source;
+        trendWindow = DashboardPrefs.trendWindow(this);
+        preciseNumbers = DashboardPrefs.preciseNumbers(this);
         rangeGroup.check(rangeButtonId(selectedRange));
         sourceGroup.check(sourceButtonId(selectedSource));
+        trendRangeGroup.check(trendRangeButtonId(trendWindow));
         bindActions();
+        bindNumberModeToggles();
 
         configurationRequest = getIntent().hasExtra(AppWidgetManager.EXTRA_APPWIDGET_ID);
         if (configurationRequest) {
@@ -153,6 +162,12 @@ public final class MainActivity extends ComponentActivity {
         }
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        resumePendingUpdateInstallIfAllowed();
+    }
+
     private void prepareEdgeToEdge() {
         Window window = getWindow();
         WindowCompat.setDecorFitsSystemWindows(window, false);
@@ -177,6 +192,7 @@ public final class MainActivity extends ComponentActivity {
         rangeGroup = findViewById(R.id.dashboard_range_group);
         sourceGroup = findViewById(R.id.dashboard_source_group);
         trendGroup = findViewById(R.id.dashboard_trend_group);
+        trendRangeGroup = findViewById(R.id.dashboard_trend_range_group);
         dashboardData = findViewById(R.id.dashboard_data);
         emptyState = findViewById(R.id.dashboard_empty_state);
         emptyTitle = findViewById(R.id.dashboard_empty_title);
@@ -187,8 +203,8 @@ public final class MainActivity extends ComponentActivity {
         connectionDot = findViewById(R.id.dashboard_connection_dot);
         backendDot = findViewById(R.id.dashboard_backend_dot);
         backendDetailText = findViewById(R.id.dashboard_backend_detail);
-        backendRestartButton = findViewById(R.id.dashboard_backend_restart);
-        backendStopButton = findViewById(R.id.dashboard_backend_stop);
+        backendManageButton = findViewById(R.id.dashboard_backend_manage);
+        updateButton = findViewById(R.id.dashboard_update);
         tokensText = findViewById(R.id.dashboard_tokens);
         costText = findViewById(R.id.dashboard_cost);
         requestsText = findViewById(R.id.dashboard_requests);
@@ -203,7 +219,7 @@ public final class MainActivity extends ComponentActivity {
         lifetimeCostText = findViewById(R.id.dashboard_lifetime_cost);
         recentSubtitle = findViewById(R.id.dashboard_recent_subtitle);
         recentList = findViewById(R.id.dashboard_recent_list);
-        modelsList = findViewById(R.id.dashboard_models_list);
+        modelsChart = findViewById(R.id.dashboard_models_chart);
         trendChart = findViewById(R.id.dashboard_trend);
         trendDetailText = findViewById(R.id.dashboard_trend_detail);
         trendPeakText = findViewById(R.id.dashboard_trend_peak);
@@ -211,11 +227,12 @@ public final class MainActivity extends ComponentActivity {
     }
 
     private void bindActions() {
+        updateButton.setOnClickListener(view -> checkForAppUpdate());
         findViewById(R.id.dashboard_settings).setOnClickListener(view -> showConnectionSettings(false));
         findViewById(R.id.dashboard_add_widget).setOnClickListener(view -> requestWidgetPin());
         findViewById(R.id.dashboard_refresh).setOnClickListener(view -> refreshDashboard());
-        backendRestartButton.setOnClickListener(view -> confirmBackendAction("restart"));
-        backendStopButton.setOnClickListener(view -> confirmBackendAction("stop"));
+        backendManageButton.setOnClickListener(view ->
+                startActivity(new Intent(this, BackendManagementActivity.class)));
         emptyAction.setOnClickListener(view -> {
             if (emptyStateMode == STATE_NOT_CONFIGURED) {
                 showConnectionSettings(false);
@@ -246,6 +263,156 @@ public final class MainActivity extends ComponentActivity {
             trendRequests = checkedId == R.id.dashboard_trend_requests;
             if (lastSnapshot != null) renderTrend(lastSnapshot);
         });
+        trendRangeGroup.addOnButtonCheckedListener((group, checkedId, isChecked) -> {
+            if (!isChecked) return;
+            String range = trendWindowForButton(checkedId);
+            if (range == null || range.equals(trendWindow)) return;
+            trendWindow = range;
+            DashboardPrefs.saveTrendWindow(this, trendWindow);
+            if (lastSnapshot != null) renderTrend(lastSnapshot);
+        });
+    }
+
+    private void bindNumberModeToggles() {
+        View.OnClickListener toggle = view -> toggleNumberMode();
+        tokensText.setOnClickListener(toggle);
+        costText.setOnClickListener(toggle);
+        requestsText.setOnClickListener(toggle);
+        latencyText.setOnClickListener(toggle);
+        rpmText.setOnClickListener(toggle);
+        tpmText.setOnClickListener(toggle);
+        successText.setOnClickListener(toggle);
+        servicesText.setOnClickListener(toggle);
+        keysText.setOnClickListener(toggle);
+        lifetimeTokensText.setOnClickListener(toggle);
+        lifetimeRequestsText.setOnClickListener(toggle);
+        lifetimeCostText.setOnClickListener(toggle);
+        modelsChart.setOnClickListener(toggle);
+    }
+
+    private void checkForAppUpdate() {
+        if (updateInFlight) return;
+        setUpdateBusy(true, getString(R.string.dashboard_update_checking));
+        updateRequest = UpdateClient.checkForUpdate(this, new UpdateClient.Listener() {
+            @Override
+            public void onCheckComplete(UpdateClient.CheckResult result) {
+                updateRequest = null;
+                setUpdateBusy(false, null);
+                if (isFinishing()) return;
+                if (!result.updateAvailable) {
+                    Toast.makeText(MainActivity.this, R.string.dashboard_update_current, Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                showUpdateAvailable(result.latestRelease);
+            }
+
+            @Override
+            public void onError(UpdateClient.UpdateException error) {
+                updateRequest = null;
+                setUpdateBusy(false, null);
+                if (!isFinishing()) {
+                    Toast.makeText(MainActivity.this, R.string.dashboard_update_failed, Toast.LENGTH_LONG).show();
+                }
+            }
+        });
+    }
+
+    private void showUpdateAvailable(UpdateClient.ReleaseInfo release) {
+        String notes = release.releaseNotes == null ? "" : release.releaseNotes.trim();
+        if (notes.length() > 600) notes = notes.substring(0, 600) + "…";
+        String message = getString(R.string.dashboard_update_available_message, release.versionName);
+        if (!notes.isEmpty()) message += "\n\n" + notes;
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.dashboard_update_available_title)
+                .setMessage(message)
+                .setNegativeButton(R.string.dashboard_update_later, null)
+                .setPositiveButton(R.string.dashboard_update_now,
+                        (dialog, which) -> downloadAndInstallUpdate(release))
+                .show();
+    }
+
+    private void downloadAndInstallUpdate(UpdateClient.ReleaseInfo release) {
+        if (updateInFlight) return;
+        setUpdateBusy(true, getString(R.string.dashboard_update_downloading));
+        updateRequest = UpdateClient.downloadUpdate(this, release, new UpdateClient.Listener() {
+            @Override
+            public void onDownloadProgress(UpdateClient.ReleaseInfo ignored, long downloaded, long total) {
+                if (total <= 0L) return;
+                int percent = (int) Math.min(100L, Math.max(0L, downloaded * 100L / total));
+                updateButton.setText(getString(R.string.dashboard_update_download_progress, percent));
+            }
+
+            @Override
+            public void onDownloaded(UpdateClient.ReleaseInfo ignored, java.io.File apk) {
+                updateRequest = null;
+                try {
+                    UpdateInstaller.InstallResult result = UpdateInstaller.requestInstall(MainActivity.this, apk);
+                    setUpdateBusy(false, null);
+                    if (result == UpdateInstaller.InstallResult.PERMISSION_REQUIRED) {
+                        Toast.makeText(
+                                MainActivity.this,
+                                R.string.dashboard_update_permission_required,
+                                Toast.LENGTH_LONG
+                        ).show();
+                    } else if (result == UpdateInstaller.InstallResult.INSTALLER_OPENED) {
+                        Toast.makeText(
+                                MainActivity.this,
+                                R.string.dashboard_update_installer_opened,
+                                Toast.LENGTH_SHORT
+                        ).show();
+                    }
+                } catch (UpdateInstaller.InstallException error) {
+                    setUpdateBusy(false, null);
+                    if (!isFinishing()) {
+                        Toast.makeText(MainActivity.this, R.string.dashboard_update_failed, Toast.LENGTH_LONG).show();
+                    }
+                }
+            }
+
+            @Override
+            public void onError(UpdateClient.UpdateException error) {
+                updateRequest = null;
+                setUpdateBusy(false, null);
+                if (!isFinishing()) {
+                    Toast.makeText(MainActivity.this, R.string.dashboard_update_failed, Toast.LENGTH_LONG).show();
+                }
+            }
+        });
+    }
+
+    private void resumePendingUpdateInstallIfAllowed() {
+        if (!UpdateInstaller.hasPendingInstall(this)) return;
+        if (!UpdateInstaller.canRequestPackageInstalls(this)) return;
+        try {
+            UpdateInstaller.InstallResult result = UpdateInstaller.resumePendingInstall(this);
+            if (result == UpdateInstaller.InstallResult.INSTALLER_OPENED) {
+                Toast.makeText(this, R.string.dashboard_update_installer_opened, Toast.LENGTH_SHORT).show();
+            }
+        } catch (UpdateInstaller.InstallException error) {
+            Toast.makeText(this, R.string.dashboard_update_failed, Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void setUpdateBusy(boolean busy, String label) {
+        updateInFlight = busy;
+        updateButton.setEnabled(!busy);
+        updateButton.setText(label == null ? getString(R.string.dashboard_update) : label);
+    }
+
+    private void toggleNumberMode() {
+        preciseNumbers = !preciseNumbers;
+        DashboardPrefs.savePreciseNumbers(this, preciseNumbers);
+        if (lastSnapshot != null) renderSnapshot(lastSnapshot);
+        Toast.makeText(
+                this,
+                getString(
+                        R.string.dashboard_numbers_changed,
+                        getString(preciseNumbers
+                                ? R.string.dashboard_numbers_precise
+                                : R.string.dashboard_numbers_compact)
+                ),
+                Toast.LENGTH_SHORT
+        ).show();
     }
 
     private void requestWidgetPin() {
@@ -298,12 +465,12 @@ public final class MainActivity extends ComponentActivity {
             try {
                 DashboardClient.BackendStatus status = DashboardClient.fetchBackend(config);
                 main.post(() -> {
-                    if (dashboardRequestId != requestSequence || isFinishing() || backendActionInFlight) return;
+                    if (dashboardRequestId != requestSequence || isFinishing()) return;
                     renderBackendStatus(status);
                 });
             } catch (Exception ignored) {
                 main.post(() -> {
-                    if (dashboardRequestId != requestSequence || isFinishing() || backendActionInFlight) return;
+                    if (dashboardRequestId != requestSequence || isFinishing()) return;
                     showBackendUnavailable();
                 });
             }
@@ -311,7 +478,6 @@ public final class MainActivity extends ComponentActivity {
     }
 
     private void renderBackendStatus(DashboardClient.BackendStatus status) {
-        backendStatus = status;
         String address = backendAddress(status);
         if ("stopping".equals(status.status)) {
             backendDetailText.setText(getString(R.string.dashboard_backend_stopping, address));
@@ -328,81 +494,11 @@ public final class MainActivity extends ComponentActivity {
             backendDetailText.setText(detail);
             setBackendTone(getColor(R.color.green));
         }
-        backendRestartButton.setEnabled(status.canRestart());
-        backendStopButton.setEnabled(status.canStop());
     }
 
     private void showBackendUnavailable() {
-        backendStatus = null;
         backendDetailText.setText(R.string.dashboard_backend_unavailable);
         setBackendTone(getColor(R.color.status_error));
-        backendRestartButton.setEnabled(false);
-        backendStopButton.setEnabled(false);
-    }
-
-    private void confirmBackendAction(String action) {
-        if (backendActionInFlight || backendStatus == null) return;
-        boolean restart = "restart".equals(action);
-        if (restart ? !backendStatus.canRestart() : !backendStatus.canStop()) return;
-        new MaterialAlertDialogBuilder(this)
-                .setTitle(restart
-                        ? R.string.dashboard_backend_restart_confirm_title
-                        : R.string.dashboard_backend_stop_confirm_title)
-                .setMessage(restart
-                        ? R.string.dashboard_backend_restart_confirm_message
-                        : R.string.dashboard_backend_stop_confirm_message)
-                .setNegativeButton(android.R.string.cancel, null)
-                .setPositiveButton(restart
-                        ? R.string.dashboard_backend_restart
-                        : R.string.dashboard_backend_stop,
-                        (dialog, which) -> runBackendAction(action))
-                .show();
-    }
-
-    private void runBackendAction(String action) {
-        DashboardPrefs.Config config = DashboardPrefs.load(this);
-        if (!config.isConfigured()) return;
-        backendActionInFlight = true;
-        backendRestartButton.setEnabled(false);
-        backendStopButton.setEnabled(false);
-        backendDetailText.setText(getString(
-                R.string.dashboard_backend_action_pending,
-                "restart".equals(action)
-                        ? getString(R.string.dashboard_backend_restart)
-                        : getString(R.string.dashboard_backend_stop)
-        ));
-        setBackendTone(getColor(R.color.amber));
-
-        dashboardExecutor.execute(() -> {
-            try {
-                DashboardClient.controlBackend(config, action);
-                main.post(() -> {
-                    if (isFinishing()) return;
-                    backendActionInFlight = false;
-                    if ("restart".equals(action)) {
-                        backendDetailText.setText(getString(
-                                R.string.dashboard_backend_stopping,
-                                backendStatus == null ? config.baseUrl : backendAddress(backendStatus)
-                        ));
-                        setBackendTone(getColor(R.color.amber));
-                        main.postDelayed(this::refreshDashboard, 2_500L);
-                    } else {
-                        backendStatus = null;
-                        backendDetailText.setText(R.string.dashboard_backend_stopped);
-                        setBackendTone(getColor(R.color.status_error));
-                    }
-                    backendRestartButton.setEnabled(false);
-                    backendStopButton.setEnabled(false);
-                });
-            } catch (Exception ignored) {
-                main.post(() -> {
-                    if (isFinishing()) return;
-                    backendActionInFlight = false;
-                    Toast.makeText(this, R.string.dashboard_backend_action_failed, Toast.LENGTH_SHORT).show();
-                    refreshBackendStatus(config, requestSequence);
-                });
-            }
-        });
     }
 
     private String backendAddress(DashboardClient.BackendStatus status) {
@@ -441,20 +537,20 @@ public final class MainActivity extends ComponentActivity {
         updatedText.setText(getString(R.string.dashboard_updated, displayTime(snapshot.generatedAt)));
         setConnectionTone(getColor(R.color.green));
 
-        tokensText.setText(compact(snapshot.tokens));
-        costText.setText(money(snapshot.cost));
-        requestsText.setText(compact(snapshot.requests));
+        tokensText.setText(displayNumber(snapshot.tokens));
+        costText.setText(displayMoney(snapshot.cost));
+        requestsText.setText(displayNumber(snapshot.requests));
         latencyText.setText(latency(snapshot.avgLatencyMs));
-        rpmText.setText(compact(snapshot.rpm));
-        tpmText.setText(compact(snapshot.tpm));
+        rpmText.setText(displayNumber(snapshot.rpm));
+        tpmText.setText(displayNumber(snapshot.tpm));
         successText.setText(rate(snapshot.successRate));
         servicesText.setText(snapshot.servicesTotal > 0
                 ? snapshot.servicesHealthy + "/" + snapshot.servicesTotal
                 : "--");
-        keysText.setText(compact(snapshot.activeKeys));
-        lifetimeTokensText.setText(compact(snapshot.lifetimeTokens));
-        lifetimeRequestsText.setText(compact(snapshot.lifetimeRequests));
-        lifetimeCostText.setText(money(snapshot.lifetimeCost));
+        keysText.setText(displayNumber(snapshot.activeKeys));
+        lifetimeTokensText.setText(displayNumber(snapshot.lifetimeTokens));
+        lifetimeRequestsText.setText(displayNumber(snapshot.lifetimeRequests));
+        lifetimeCostText.setText(displayMoney(snapshot.lifetimeCost));
         recentSubtitle.setText(snapshot.recent.isEmpty()
                 ? getString(R.string.dashboard_no_recent)
                 : getString(R.string.dashboard_recent_subtitle));
@@ -482,7 +578,7 @@ public final class MainActivity extends ComponentActivity {
             TextView heading = dashboardText(15f, Typeface.BOLD, getColor(R.color.ink));
             heading.setSingleLine(true);
             heading.setEllipsize(TextUtils.TruncateAt.END);
-            heading.setText(item.project + " | " + money(item.cost));
+            heading.setText(item.project + " | " + displayMoney(item.cost));
             TextView meta = dashboardText(12f, Typeface.NORMAL, getColor(R.color.muted));
             meta.setSingleLine(true);
             meta.setEllipsize(TextUtils.TruncateAt.END);
@@ -490,7 +586,7 @@ public final class MainActivity extends ComponentActivity {
                     R.string.dashboard_recent_meta,
                     displayTime(item.timestamp),
                     item.model,
-                    compact(item.tokens) + " Token | " + latency(item.latencyMs)
+                    displayNumber(item.tokens) + " Token | " + latency(item.latencyMs)
             ));
             row.addView(heading);
             row.addView(meta, withTopMargin(0));
@@ -500,45 +596,16 @@ public final class MainActivity extends ComponentActivity {
     }
 
     private void renderModels(DashboardClient.Snapshot snapshot) {
-        modelsList.removeAllViews();
-        if (snapshot.models.isEmpty()) {
-            modelsList.addView(emptyListText(R.string.dashboard_no_models));
-            return;
-        }
-        for (int index = 0; index < snapshot.models.size(); index++) {
-            DashboardClient.Model item = snapshot.models.get(index);
-            LinearLayout row = new LinearLayout(this);
-            row.setLayoutParams(new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-            ));
-            row.setOrientation(LinearLayout.VERTICAL);
-            row.setPadding(0, dp(7), 0, dp(7));
-
-            TextView heading = dashboardText(15f, Typeface.BOLD, getColor(R.color.ink));
-            heading.setSingleLine(true);
-            heading.setEllipsize(TextUtils.TruncateAt.END);
-            heading.setText(getString(R.string.dashboard_model_rank, index + 1) + "  " + item.model);
-            TextView meta = dashboardText(12f, Typeface.NORMAL, getColor(R.color.muted));
-            meta.setText(getString(
-                    R.string.dashboard_model_meta,
-                    compact(item.tokens),
-                    compact(item.requests),
-                    rate(item.share)
-            ));
-            row.addView(heading);
-            row.addView(meta, withTopMargin(0));
-            modelsList.addView(row);
-            if (index < snapshot.models.size() - 1) modelsList.addView(divider());
-        }
+        modelsChart.setModels(snapshot.models, preciseNumbers);
     }
 
     private void renderTrend(DashboardClient.Snapshot snapshot) {
-        trendChart.setTrend(snapshot.timeline, trendRequests);
-        if (snapshot.timeline.isEmpty()) trendDetailText.setText(R.string.dashboard_trend_tap_hint);
+        List<DashboardClient.TimelinePoint> timeline = filteredTimeline(snapshot.timeline);
+        trendChart.setTrend(timeline, trendRequests);
+        if (timeline.isEmpty()) trendDetailText.setText(R.string.dashboard_no_trend);
         long peak = 0;
         long total = 0;
-        for (DashboardClient.TimelinePoint point : snapshot.timeline) {
+        for (DashboardClient.TimelinePoint point : timeline) {
             long value = trendRequests ? point.requests : point.tokens;
             peak = Math.max(peak, value);
             total += value;
@@ -546,8 +613,36 @@ public final class MainActivity extends ComponentActivity {
         String unit = getString(trendRequests
                 ? R.string.dashboard_trend_requests
                 : R.string.dashboard_trend_tokens);
-        trendPeakText.setText(getString(R.string.dashboard_trend_peak, compact(peak) + " " + unit));
-        trendTotalText.setText(getString(R.string.dashboard_trend_total, compact(total) + " " + unit));
+        trendPeakText.setText(getString(R.string.dashboard_trend_peak, displayNumber(peak) + " " + unit));
+        trendTotalText.setText(getString(R.string.dashboard_trend_total, displayNumber(total) + " " + unit));
+    }
+
+    private List<DashboardClient.TimelinePoint> filteredTimeline(
+            List<DashboardClient.TimelinePoint> source
+    ) {
+        if (source == null || source.isEmpty() || "all".equals(trendWindow)) {
+            return source == null ? new ArrayList<>() : new ArrayList<>(source);
+        }
+        int hours = "6h".equals(trendWindow) ? 6 : "12h".equals(trendWindow) ? 12 : 24;
+        long cutoff = System.currentTimeMillis() - hours * 3_600_000L;
+        List<DashboardClient.TimelinePoint> filtered = new ArrayList<>();
+        for (DashboardClient.TimelinePoint point : source) {
+            Long timestamp = timelineEpochMillis(point.timestamp);
+            // Retain service-supplied buckets without a parseable timestamp rather than hiding data.
+            if (timestamp == null || timestamp >= cutoff) filtered.add(point);
+        }
+        return filtered;
+    }
+
+    private Long timelineEpochMillis(String value) {
+        if (value == null || value.isEmpty()) return null;
+        try {
+            if (value.matches("\\d{13}")) return Long.parseLong(value);
+            if (value.matches("\\d{10}")) return Long.parseLong(value) * 1_000L;
+            return Instant.parse(value).toEpochMilli();
+        } catch (DateTimeParseException | NumberFormatException ignored) {
+            return null;
+        }
     }
 
     private void renderTrendPoint(DashboardClient.TimelinePoint point, boolean requestsMode) {
@@ -654,7 +749,8 @@ public final class MainActivity extends ComponentActivity {
 
         TextInputLayout urlLayout = outlinedInput(getString(R.string.config_url_label));
         TextInputEditText urlInput = new TextInputEditText(this);
-        urlInput.setHint(R.string.config_url_hint);
+        // TextInputLayout owns the floating label; a child hint would overlap it before focus.
+        urlLayout.setPlaceholderText(getString(R.string.config_url_hint));
         urlInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
         urlInput.setSingleLine(true);
         urlInput.setText(config.baseUrl);
@@ -663,7 +759,7 @@ public final class MainActivity extends ComponentActivity {
 
         TextInputLayout passwordLayout = outlinedInput(getString(R.string.config_password_label));
         TextInputEditText passwordInput = new TextInputEditText(this);
-        passwordInput.setHint(R.string.config_password_hint);
+        passwordLayout.setPlaceholderText(getString(R.string.config_password_hint));
         passwordInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         passwordInput.setSingleLine(true);
         passwordInput.setText(config.password);
@@ -762,6 +858,13 @@ public final class MainActivity extends ComponentActivity {
         return R.id.dashboard_range_today;
     }
 
+    private int trendRangeButtonId(String range) {
+        if ("6h".equals(range)) return R.id.dashboard_trend_range_6h;
+        if ("12h".equals(range)) return R.id.dashboard_trend_range_12h;
+        if ("24h".equals(range)) return R.id.dashboard_trend_range_24h;
+        return R.id.dashboard_trend_range_all;
+    }
+
     private int sourceButtonId(String source) {
         if ("local".equals(source)) return R.id.dashboard_source_local;
         if ("sub2api".equals(source)) return R.id.dashboard_source_sub2api;
@@ -774,6 +877,14 @@ public final class MainActivity extends ComponentActivity {
         if (buttonId == R.id.dashboard_range_today) return "today";
         if (buttonId == R.id.dashboard_range_24h) return "24h";
         if (buttonId == R.id.dashboard_range_7d) return "7d";
+        return null;
+    }
+
+    private String trendWindowForButton(int buttonId) {
+        if (buttonId == R.id.dashboard_trend_range_6h) return "6h";
+        if (buttonId == R.id.dashboard_trend_range_12h) return "12h";
+        if (buttonId == R.id.dashboard_trend_range_24h) return "24h";
+        if (buttonId == R.id.dashboard_trend_range_all) return "all";
         return null;
     }
 
@@ -809,8 +920,16 @@ public final class MainActivity extends ComponentActivity {
         return String.format(Locale.getDefault(), "%.1f%s", number, suffix);
     }
 
+    private String displayNumber(long value) {
+        return preciseNumbers ? exactNumber(value) : compact(value);
+    }
+
     private static String money(double value) {
         return String.format(Locale.US, "$%.2f", value);
+    }
+
+    private String displayMoney(double value) {
+        return preciseNumbers ? moneyDetailed(value) : money(value);
     }
 
     private static String moneyDetailed(double value) {
@@ -857,6 +976,7 @@ public final class MainActivity extends ComponentActivity {
     @Override
     protected void onDestroy() {
         requestSequence++;
+        if (updateRequest != null) updateRequest.cancel();
         dashboardExecutor.shutdownNow();
         main.removeCallbacksAndMessages(null);
         super.onDestroy();

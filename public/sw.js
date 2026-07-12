@@ -1,9 +1,9 @@
-const CACHE_NAME = "api-monitor-shell-v7";
+const CACHE_NAME = "api-monitor-shell-v8";
 const SHELL_ASSETS = [
   "./",
   "./index.html",
-  "./styles.css?v=5",
-  "./app.js?v=7",
+  "./styles.css?v=6",
+  "./app.js?v=8",
   "./manifest.webmanifest",
   "./icon.svg"
 ];

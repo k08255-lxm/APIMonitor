@@ -53,9 +53,22 @@
                 </LinearLayout>
 
                 <com.google.android.material.button.MaterialButton
+                    android:id="@+id/dashboard_update"
+                    android:layout_width="wrap_content"
+                    android:layout_height="48dp"
+                    android:contentDescription="@string/dashboard_update"
+                    android:text="@string/dashboard_update"
+                    android:textAllCaps="false"
+                    app:backgroundTint="?attr/colorSecondaryContainer"
+                    app:cornerRadius="24dp"
+                    app:strokeWidth="0dp"
+                    android:textColor="?attr/colorOnSecondaryContainer" />
+
+                <com.google.android.material.button.MaterialButton
                     android:id="@+id/dashboard_settings"
                     android:layout_width="wrap_content"
                     android:layout_height="48dp"
+                    android:layout_marginLeft="6dp"
                     android:contentDescription="@string/dashboard_connection_settings"
                     android:text="@string/dashboard_settings"
                     android:textAllCaps="false"
@@ -298,40 +311,17 @@
                             </LinearLayout>
                         </LinearLayout>
 
-                        <LinearLayout
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/dashboard_backend_manage"
                             android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
+                            android:layout_height="44dp"
                             android:layout_marginTop="12dp"
-                            android:orientation="horizontal">
-
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/dashboard_backend_restart"
-                                android:layout_width="0dp"
-                                android:layout_height="44dp"
-                                android:layout_weight="1"
-                                android:enabled="false"
-                                android:text="@string/dashboard_backend_restart"
-                                android:textAllCaps="false"
-                                android:textColor="?attr/colorOnSecondaryContainer"
-                                app:backgroundTint="?attr/colorSecondaryContainer"
-                                app:cornerRadius="22dp"
-                                app:strokeWidth="0dp" />
-
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/dashboard_backend_stop"
-                                android:layout_width="0dp"
-                                android:layout_height="44dp"
-                                android:layout_marginLeft="8dp"
-                                android:layout_weight="1"
-                                android:enabled="false"
-                                android:text="@string/dashboard_backend_stop"
-                                android:textAllCaps="false"
-                                android:textColor="?attr/colorError"
-                                app:backgroundTint="@android:color/transparent"
-                                app:cornerRadius="22dp"
-                                app:strokeColor="?attr/colorError"
-                                app:strokeWidth="1dp" />
-                        </LinearLayout>
+                            android:text="@string/dashboard_backend_manage"
+                            android:textAllCaps="false"
+                            android:textColor="?attr/colorOnSecondaryContainer"
+                            app:backgroundTint="?attr/colorSecondaryContainer"
+                            app:cornerRadius="8dp"
+                            app:strokeWidth="0dp" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
@@ -584,6 +574,63 @@
                             </com.google.android.material.button.MaterialButtonToggleGroup>
                         </LinearLayout>
 
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="14dp"
+                            android:text="@string/dashboard_trend_range_label"
+                            android:textAppearance="?attr/textAppearanceLabelLarge"
+                            android:textColor="?attr/colorOnSurface" />
+
+                        <HorizontalScrollView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:clipToPadding="false"
+                            android:scrollbars="none">
+
+                            <com.google.android.material.button.MaterialButtonToggleGroup
+                                android:id="@+id/dashboard_trend_range_group"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                app:checkedButton="@id/dashboard_trend_range_all"
+                                app:selectionRequired="true"
+                                app:singleSelection="true">
+
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/dashboard_trend_range_6h"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="40dp"
+                                    android:minWidth="0dp"
+                                    android:text="@string/dashboard_trend_range_6h"
+                                    android:textAllCaps="false" />
+
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/dashboard_trend_range_12h"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="40dp"
+                                    android:minWidth="0dp"
+                                    android:text="@string/dashboard_trend_range_12h"
+                                    android:textAllCaps="false" />
+
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/dashboard_trend_range_24h"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="40dp"
+                                    android:minWidth="0dp"
+                                    android:text="@string/dashboard_trend_range_24h"
+                                    android:textAllCaps="false" />
+
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/dashboard_trend_range_all"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="40dp"
+                                    android:minWidth="0dp"
+                                    android:text="@string/dashboard_trend_range_all"
+                                    android:textAllCaps="false" />
+                            </com.google.android.material.button.MaterialButtonToggleGroup>
+                        </HorizontalScrollView>
+
                         <com.apimonitor.widget.TrendChartView
                             android:id="@+id/dashboard_trend"
                             android:layout_width="match_parent"
@@ -697,12 +744,11 @@
                             android:textAppearance="?attr/textAppearanceBodySmall"
                             android:textColor="?attr/colorOnSurfaceVariant" />
 
-                        <LinearLayout
-                            android:id="@+id/dashboard_models_list"
+                        <com.apimonitor.widget.ModelBarChartView
+                            android:id="@+id/dashboard_models_chart"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="10dp"
-                            android:orientation="vertical" />
+                            android:layout_marginTop="10dp" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 

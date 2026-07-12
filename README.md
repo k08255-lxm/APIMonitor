@@ -76,6 +76,15 @@ host/port 启动新实例。
 `data/server-state.json` 中仅供本机校验的控制 token。绝不要复制、上传或向网页、
 Android App、他人泄露该文件及其中的 token。
 
+### Windows 开机自启
+
+网页“后端管理”和 Android App“后端管理”均可管理当前 Windows 用户的登录启动项。该操作要求已经设置 `DASHBOARD_PASSWORD`，并与“重启/关闭后端”使用相同的 Basic Auth；它只会写入或删除
+`HKCU\Software\Microsoft\Windows\CurrentVersion\Run\APIMonitor`，不会创建管理员级服务、计划任务或防火墙规则。
+
+- **登录后持续运行**：登录 Windows 后调用既有启动器，以无浏览器方式保持监控服务运行。
+- **随 cc-switch 启动**：登录后只启动轻量监听器；它连续两次检测到 `cc-switch.exe` 已启动后，才调用既有启动器启动监控服务。
+- 关闭开关会移除上述当前用户启动项。该功能仅支持 Windows；非 Windows 服务端会如实显示为不可用。
+
 ## 数据来源
 
 ### 本地代理
@@ -160,7 +169,7 @@ Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8787/api/events `
 
 ## Android 小组件
 
-`android-widget/` 包含一个标准 Java `AppWidgetProvider` 和一个简易配置界面。
+`android-widget/` 包含一个标准 Java `AppWidgetProvider` 和一个原生 Material Design 3 仪表盘。
 该目录是源码，不包含可直接安装的 APK；必须先构建并把 APK 安装到手机，系统的
 “小组件”列表才会出现“API 监测台”。完整的构建、安装、添加到桌面和后续修改配置的
 步骤见 [android-widget/README.md](android-widget/README.md)。构建工具准备完成后，
@@ -171,6 +180,8 @@ Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8787/api/events `
 通常的 30 分钟最短周期轮询，也支持手动刷新。组件目标为 `4 x 5`，点击组件主体会进入
 原生 Material Design 3 仪表盘，其中包含网页面板的核心指标、数据源/时间范围、趋势、
 最近调用、模型排行和累计总览；不会跳转到浏览器。
+
+小组件始终只显示最近五条，保证 `4 x 5` 布局稳定；App 仪表盘则最多显示最近 50 条。App 支持 6/12/24 小时或全部趋势窗口、模型横向柱状排行，以及点按数据在紧凑单位和精确数值之间切换。后端管理页提供运行详情、启停和开机自启模式。首页的“检查更新”会查询 GitHub 正式发布，发现新版本后可下载、校验并交给 Android 系统安装器完成更新；首次更新需要在系统页面授权该 App 安装未知来源应用。
 
 如果使用局域网 HTTP URL，需要按照 `android-widget/README.md` 的说明启用明文流量；
 生产环境请使用 HTTPS 并关闭明文访问。

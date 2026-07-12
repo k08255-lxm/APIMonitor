@@ -14,8 +14,8 @@
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="icon" href="/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/icon.svg">
-    <link rel="stylesheet" href="/styles.css?v=5">
-    <script src="/app.js?v=7" defer></script>
+    <link rel="stylesheet" href="/styles.css?v=6">
+    <script src="/app.js?v=8" defer></script>
   </head>
   <body class="initial-loading">
     <a class="skip-link" href="#main-content">跳到主要内容</a>
@@ -60,14 +60,7 @@
             <p id="backend-detail">正在读取运行状态...</p>
           </div>
         </div>
-        <div id="backend-actions" class="backend-actions" data-busy="false">
-          <button id="backend-restart" class="icon-button" type="button" aria-label="重启后端服务" title="重启后端服务" disabled>
-            <span class="refresh-glyph" aria-hidden="true">↻</span>
-          </button>
-          <button id="backend-stop" class="icon-button backend-stop" type="button" aria-label="关闭后端服务" title="关闭后端服务" disabled>
-            <span aria-hidden="true">■</span>
-          </button>
-        </div>
+        <button id="backend-menu" class="backend-menu" type="button" aria-label="打开后端管理">管理<span aria-hidden="true">›</span></button>
       </section>
       <div class="source-toolbar">
         <label class="source-control" for="source-select">
@@ -179,9 +172,17 @@
                   <h2 id="trend-title">用量趋势</h2>
                   <p id="trend-subtitle">当前范围</p>
                 </div>
-                <div class="chart-switch" role="group" aria-label="趋势指标">
-                  <button type="button" data-chart-mode="tokens" aria-pressed="true">Token</button>
-                  <button type="button" data-chart-mode="requests" aria-pressed="false">请求</button>
+                <div class="chart-controls">
+                  <div class="chart-switch" role="group" aria-label="趋势指标">
+                    <button type="button" data-chart-mode="tokens" aria-pressed="true">Token</button>
+                    <button type="button" data-chart-mode="requests" aria-pressed="false">请求</button>
+                  </div>
+                  <div class="chart-window-switch" role="group" aria-label="趋势图时间窗口">
+                    <button type="button" data-chart-window="6h" aria-pressed="false">6 小时</button>
+                    <button type="button" data-chart-window="12h" aria-pressed="false">12 小时</button>
+                    <button type="button" data-chart-window="24h" aria-pressed="false">24 小时</button>
+                    <button type="button" data-chart-window="all" aria-pressed="true">全部</button>
+                  </div>
                 </div>
               </div>
               <div class="chart-wrap">
@@ -200,7 +201,7 @@
                   <h2 id="models-title">模型排行</h2>
                   <p>按 Token 用量</p>
                 </div>
-                <span class="count-label">TOP 4</span>
+                <span id="models-count" class="count-label">TOP 8</span>
               </div>
               <ol id="models-list" class="models-list" aria-live="polite">
                 <li class="list-placeholder">正在读取模型数据...</li>
@@ -342,6 +343,73 @@
         <footer class="settings-actions">
           <button id="settings-cancel" class="secondary-button" type="button">取消</button>
           <button id="settings-save" class="primary-button" type="submit">保存并应用</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="backend-dialog" class="settings-dialog backend-dialog" aria-labelledby="backend-dialog-title">
+      <form id="backend-form" class="settings-form" autocomplete="off">
+        <header class="settings-header">
+          <div>
+            <p>本机服务</p>
+            <h2 id="backend-dialog-title">后端管理</h2>
+          </div>
+          <button id="backend-close" class="dialog-close" type="button" aria-label="关闭后端管理" title="关闭后端管理">
+            <span aria-hidden="true">×</span>
+          </button>
+        </header>
+
+        <div class="settings-body backend-body">
+          <section class="backend-overview" aria-labelledby="backend-runtime-title">
+            <div id="backend-dialog-state" class="backend-dialog-state">
+              <span id="backend-dialog-dot" class="backend-dot" aria-hidden="true"></span>
+              <div>
+                <h3 id="backend-runtime-title">正在读取运行状态</h3>
+                <p id="backend-dialog-summary">请稍候</p>
+              </div>
+            </div>
+            <dl class="backend-details">
+              <div><dt>监听地址</dt><dd id="backend-address">--</dd></div>
+              <div><dt>运行时长</dt><dd id="backend-uptime">--</dd></div>
+              <div><dt>启动时间</dt><dd id="backend-started-at">--</dd></div>
+              <div><dt>进程 ID</dt><dd id="backend-process-id">--</dd></div>
+              <div class="backend-instance"><dt>实例 ID</dt><dd id="backend-instance-id">--</dd></div>
+            </dl>
+          </section>
+
+          <section class="settings-section backend-autostart" aria-labelledby="autostart-title">
+            <div class="settings-section-heading">
+              <div>
+                <h3 id="autostart-title">开机自启</h3>
+                <p id="autostart-detail">正在读取设置</p>
+              </div>
+              <label class="switch-control">
+                <span>启用</span>
+                <input id="autostart-enabled" type="checkbox" role="switch">
+                <span class="switch-track" aria-hidden="true"></span>
+              </label>
+            </div>
+            <fieldset id="autostart-mode-field" class="scope-field">
+              <legend>启动方式</legend>
+              <div class="segmented-control autostart-mode-control">
+                <label>
+                  <input type="radio" name="autostartMode" value="always" checked>
+                  <span>登录后持续运行</span>
+                </label>
+                <label>
+                  <input type="radio" name="autostartMode" value="cc-switch">
+                  <span>cc-switch 启动时运行</span>
+                </label>
+              </div>
+            </fieldset>
+          </section>
+
+          <p id="backend-status" class="settings-status" role="status" aria-live="polite" hidden></p>
+        </div>
+
+        <footer class="settings-actions backend-dialog-actions">
+          <button id="backend-stop" class="secondary-button backend-stop" type="button">关闭服务</button>
+          <button id="backend-restart" class="primary-button" type="button">重启服务</button>
         </footer>
       </form>
     </dialog>

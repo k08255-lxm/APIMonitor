@@ -361,6 +361,32 @@ select:focus-visible {
   cursor: progress;
 }
 
+.backend-menu {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 10px 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--teal);
+  background: #ffffff;
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 760;
+  gap: 5px;
+}
+
+.backend-menu:hover {
+  border-color: #9fbdb9;
+  background: #f8fbfb;
+}
+
+.backend-menu span {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
 .backend-stop {
   color: var(--danger);
 }
@@ -468,7 +494,8 @@ select:focus-visible {
 }
 
 .range-switch,
-.chart-switch {
+.chart-switch,
+.chart-window-switch {
   display: grid;
   border: 1px solid var(--line);
   background: #dfe7e7;
@@ -915,6 +942,13 @@ main {
   align-items: center;
 }
 
+.chart-controls {
+  display: grid;
+  flex: 0 0 auto;
+  justify-items: end;
+  gap: 5px;
+}
+
 .chart-switch {
   flex: 0 0 auto;
   grid-template-columns: repeat(2, auto);
@@ -926,6 +960,30 @@ main {
   min-height: 38px;
   padding: 5px 9px;
   font-size: 0.66rem;
+}
+
+.chart-window-switch {
+  grid-template-columns: repeat(4, auto);
+  padding: 2px;
+  border-radius: 6px;
+}
+
+.chart-window-switch button {
+  min-height: 31px;
+  padding: 4px 7px;
+  border: 0;
+  border-radius: 4px;
+  color: #52666a;
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.61rem;
+  font-weight: 680;
+}
+
+.chart-window-switch button[aria-pressed="true"] {
+  color: var(--ink);
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(25, 49, 53, 0.1);
 }
 
 .chart-wrap {
@@ -1029,11 +1087,11 @@ main {
 }
 
 .model-bar {
-  height: 4px;
-  margin: 7px 0 4px 31px;
+  height: 11px;
+  margin: 8px 0 5px 31px;
   overflow: hidden;
-  border-radius: 2px;
-  background: #e6ecec;
+  border-radius: 3px;
+  background: repeating-linear-gradient(90deg, #e6ecec 0, #e6ecec calc(25% - 1px), #d9e2e2 calc(25% - 1px), #d9e2e2 25%);
 }
 
 .model-bar span {
@@ -1047,6 +1105,10 @@ main {
 .model-row:nth-child(2) .model-bar span { background: var(--teal); }
 .model-row:nth-child(3) .model-bar span { background: var(--violet); }
 .model-row:nth-child(4) .model-bar span { background: var(--amber); }
+.model-row:nth-child(5) .model-bar span { background: var(--green); }
+.model-row:nth-child(6) .model-bar span { background: var(--coral); }
+.model-row:nth-child(7) .model-bar span { background: var(--cyan); }
+.model-row:nth-child(8) .model-bar span { background: #6c7288; }
 
 .model-values {
   margin-left: 31px;
@@ -1166,6 +1228,115 @@ main {
 .settings-dialog::backdrop {
   background: rgba(19, 37, 41, 0.46);
   backdrop-filter: blur(2px);
+}
+
+.backend-body {
+  padding-top: 0;
+}
+
+.backend-overview {
+  padding: 17px 0;
+}
+
+.backend-dialog-state {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 9px;
+}
+
+.backend-dialog-state h3,
+.backend-dialog-state p {
+  margin: 0;
+}
+
+.backend-dialog-state h3 {
+  color: var(--ink);
+  font-size: 0.92rem;
+}
+
+.backend-dialog-state p {
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.backend-dialog-state[data-state="running"] .backend-dot {
+  background: var(--green);
+  box-shadow: 0 0 0 3px rgba(24, 129, 92, 0.12);
+}
+
+.backend-dialog-state[data-state="stopping"] .backend-dot {
+  background: var(--amber);
+}
+
+.backend-dialog-state[data-state="error"] .backend-dot,
+.backend-dialog-state[data-state="stopped"] .backend-dot {
+  background: var(--danger);
+}
+
+.backend-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0;
+  margin: 14px 0 0;
+}
+
+.backend-details > div {
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-muted);
+}
+
+.backend-details .backend-instance {
+  grid-column: 1 / -1;
+}
+
+.backend-details dt {
+  color: var(--muted);
+  font-size: 0.63rem;
+  font-weight: 700;
+}
+
+.backend-details dd {
+  margin: 3px 0 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 720;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.backend-autostart .scope-field {
+  margin-top: 15px;
+}
+
+.autostart-mode-control span {
+  min-height: 47px;
+  line-height: 1.25;
+}
+
+.backend-dialog-actions {
+  justify-content: flex-end;
+}
+
+.backend-dialog-actions .backend-stop {
+  color: var(--danger);
+}
+
+[data-value] {
+  cursor: pointer;
+}
+
+[data-value]:focus-visible {
+  outline: 3px solid rgba(55, 107, 177, 0.38);
+  outline-offset: 3px;
 }
 
 .settings-form {
@@ -1573,6 +1744,15 @@ main {
   .key-label { display: none; }
   .state-panel { grid-template-columns: auto minmax(0, 1fr); }
   .state-panel .text-button { grid-column: 1 / -1; width: 100%; }
+  .chart-heading { align-items: stretch; flex-direction: column; }
+  .chart-controls { width: 100%; justify-items: stretch; }
+  .chart-switch,
+  .chart-window-switch { width: 100%; }
+  .chart-switch { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .chart-window-switch { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .chart-window-switch button { padding-right: 3px; padding-left: 3px; }
+  .backend-details { gap: 6px; }
+  .backend-details > div { padding: 8px; }
   .settings-dialog { width: calc(100% - 12px); max-height: calc(100dvh - 12px); }
   .settings-body { padding-right: 12px; padding-left: 12px; }
   .settings-header, .settings-actions { padding-right: 12px; padding-left: 12px; }

@@ -318,6 +318,22 @@ describe('server integration', () => {
     const origin = `http://127.0.0.1:${port}`;
     const headers = { Authorization: basicAuthorization(password) };
     assert.equal((await fetch(`${origin}/api/backend`)).status, 401);
+    assert.equal((await fetch(`${origin}/api/autostart`)).status, 401);
+    assert.equal((await fetch(`${origin}/api/autostart`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ mode: 'always' }),
+    })).status, 401);
+
+    const autostartResponse = await fetch(`${origin}/api/autostart`, { headers });
+    assert.equal(autostartResponse.status, 200);
+    const autostart = await autostartResponse.json();
+    assert.equal(typeof autostart.supported, 'boolean');
+    assert.equal(typeof autostart.enabled, 'boolean');
+    assert.equal(typeof autostart.mode, 'string');
+    assert.equal(typeof autostart.detail, 'string');
+    assert.equal(typeof autostart.registry?.state, 'string');
+    assert.equal(Array.isArray(autostart.availableModes), true);
 
     const statusResponse = await fetch(`${origin}/api/backend`, { headers });
     assert.equal(statusResponse.status, 200);

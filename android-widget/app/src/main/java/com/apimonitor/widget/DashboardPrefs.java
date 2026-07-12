@@ -13,6 +13,8 @@ final class DashboardPrefs {
     private static final String PASSWORD = "password";
     private static final String RANGE = "range";
     private static final String SOURCE = "source";
+    private static final String TREND_WINDOW = "trend_window";
+    private static final String PRECISE_NUMBERS = "precise_numbers";
 
     private DashboardPrefs() {
     }
@@ -59,6 +61,25 @@ final class DashboardPrefs {
                 .apply();
     }
 
+    static String trendWindow(Context context) {
+        String value = preferences(context).getString(TREND_WINDOW, "all");
+        return validTrendWindow(value) ? value : "all";
+    }
+
+    static void saveTrendWindow(Context context, String value) {
+        preferences(context).edit()
+                .putString(TREND_WINDOW, validTrendWindow(value) ? value : "all")
+                .apply();
+    }
+
+    static boolean preciseNumbers(Context context) {
+        return preferences(context).getBoolean(PRECISE_NUMBERS, false);
+    }
+
+    static void savePreciseNumbers(Context context, boolean enabled) {
+        preferences(context).edit().putBoolean(PRECISE_NUMBERS, enabled).apply();
+    }
+
     static boolean validRange(String value) {
         return "today".equals(value) || "24h".equals(value) || "7d".equals(value);
     }
@@ -68,6 +89,13 @@ final class DashboardPrefs {
                 || "local".equals(value)
                 || "sub2api".equals(value)
                 || "cc-switch".equals(value)
+                || "all".equals(value);
+    }
+
+    static boolean validTrendWindow(String value) {
+        return "6h".equals(value)
+                || "12h".equals(value)
+                || "24h".equals(value)
                 || "all".equals(value);
     }
 

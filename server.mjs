@@ -14,9 +14,11 @@ import { EventStore } from './lib/event-store.mjs';
 import { keyFingerprint, normalizeEvent, parsePricing } from './lib/events.mjs';
 import { inspectRequestJson, ProxyCapture } from './lib/proxy-capture.mjs';
 import { RuntimeSettingsStore } from './lib/runtime-settings.mjs';
+import { createWindowsAutostart, resolveAutostartMode } from './scripts/windows-autostart.mjs';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const PUBLIC_ROOT = join(ROOT, 'public');
+const AUTOSTART = createWindowsAutostart({ rootDir: ROOT });
 const DATA_FILE = resolveDataFile(process.env.DATA_DIR || 'data');
 const SETTINGS_FILE = join(dirname(DATA_FILE), 'settings.json');
 const SERVER_STATE_FILE = join(dirname(DATA_FILE), 'server-state.json');
@@ -206,6 +208,14 @@ function backendControlAction(value) {
     throw new HttpError(400, 'action must be stop or restart');
   }
   return value.action;
+}
+
+function autostartMode(value) {
+  try {
+    return resolveAutostartMode(value);
+  } catch (error) {
+    throw new HttpError(400, error instanceof Error ? error.message : 'Invalid autostart mode');
+  }
 }
 
 function tokenMatches(value, expected) {
@@ -592,7 +602,7 @@ async function main() {
   const dashboardSnapshot = async (range = 'today', source = DEFAULT_DASHBOARD_SOURCE) => {
     const activeConnectorManager = connectorManager;
     const [localDashboard, connectors] = await Promise.all([
-      buildDashboard(store, { range }),
+      buildDashboard(store, { range, recentLimit: 50 }),
       activeConnectorManager.snapshot(range),
     ]);
     return mergeDashboardSources(localDashboard, connectors, { source });
@@ -719,6 +729,45 @@ async function main() {
         });
         setTimeout(() => requestShutdown({ restart: action === 'restart' }), 10).unref();
         return;
+      }
+
+      if (pathname === '/api/autostart') {
+        if (!['GET', 'POST', 'PUT'].includes(request.method || 'GET')) {
+          return sendMethodNotAllowed(response, ['GET', 'POST', 'PUT']);
+        }
+        // Changing a login entry affects future local sessions. Apply the
+        // same explicit password requirement as lifecycle controls even on a
+        // loopback-only dashboard.
+        if (!requireBackendControlAuthorization(request, response)) return;
+        if (request.method === 'GET') return sendJson(response, 200, await AUTOSTART.status());
+        if (!String(request.headers['content-type'] || '').toLowerCase().includes('application/json')) {
+          return sendJson(response, 415, { error: 'Content-Type must be application/json' });
+        }
+        const body = await readRequestBody(request, MAX_BACKEND_CONTROL_BODY_BYTES);
+        let value;
+        try {
+          value = JSON.parse(body.toString('utf8'));
+        } catch {
+          throw new HttpError(400, 'Invalid JSON body');
+        }
+        const mode = autostartMode(value);
+        let status;
+        try {
+          status = await AUTOSTART.configure(mode);
+        } catch {
+          throw new HttpError(503, 'Unable to update Windows login startup');
+        }
+        if (!status.supported) {
+          return sendJson(response, 409, {
+            error: 'Windows login startup is only supported on Windows',
+            ...status,
+          });
+        }
+        return sendJson(response, 200, {
+          updated: true,
+          requestedMode: mode,
+          ...status,
+        });
       }
 
       if (pathname === '/api/control/stop') {

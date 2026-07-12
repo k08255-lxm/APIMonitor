@@ -8,13 +8,16 @@
   };
   const VALID_RANGES = new Set(Object.keys(RANGE_LABELS));
   const VALID_SOURCES = new Set(["auto", "local", "sub2api", "cc-switch", "all"]);
+  const VALID_CHART_WINDOWS = new Set(["6h", "12h", "24h", "all"]);
   const POLL_INTERVAL_MS = 30000;
   const BACKEND_REQUEST_TIMEOUT_MS = 8000;
   const BACKEND_RESTART_RETRY_MS = 1500;
   const BACKEND_RESTART_MAX_ATTEMPTS = 12;
   const STALE_AFTER_MS = 90000;
-  const MAX_RECENT_ROWS = 8;
-  const MAX_MODEL_ROWS = 4;
+  const MAX_RECENT_ROWS = 50;
+  const MAX_MODEL_ROWS = 12;
+  const PRECISE_NUMBERS_STORAGE_KEY = "api-monitor.precise-numbers";
+  const CHART_WINDOW_STORAGE_KEY = "api-monitor.chart-window";
 
   const dom = {
     body: document.body,
@@ -58,9 +61,25 @@
     footerStatus: document.querySelector("#footer-status"),
     backendState: document.querySelector("#backend-state"),
     backendDetail: document.querySelector("#backend-detail"),
-    backendActions: document.querySelector("#backend-actions"),
+    backendMenu: document.querySelector("#backend-menu"),
+    backendDialog: document.querySelector("#backend-dialog"),
+    backendForm: document.querySelector("#backend-form"),
+    backendClose: document.querySelector("#backend-close"),
+    backendDialogState: document.querySelector("#backend-dialog-state"),
+    backendDialogDot: document.querySelector("#backend-dialog-dot"),
+    backendDialogTitle: document.querySelector("#backend-runtime-title"),
+    backendDialogSummary: document.querySelector("#backend-dialog-summary"),
+    backendAddress: document.querySelector("#backend-address"),
+    backendUptime: document.querySelector("#backend-uptime"),
+    backendStartedAt: document.querySelector("#backend-started-at"),
+    backendProcessId: document.querySelector("#backend-process-id"),
+    backendInstanceId: document.querySelector("#backend-instance-id"),
     backendRestart: document.querySelector("#backend-restart"),
     backendStop: document.querySelector("#backend-stop"),
+    backendStatus: document.querySelector("#backend-status"),
+    autostartEnabled: document.querySelector("#autostart-enabled"),
+    autostartDetail: document.querySelector("#autostart-detail"),
+    autostartModeField: document.querySelector("#autostart-mode-field"),
     sourceSelect: document.querySelector("#source-select"),
     sourceStrip: document.querySelector("#source-strip"),
     toast: document.querySelector("#toast"),
@@ -83,6 +102,7 @@
     recentList: document.querySelector("#recent-list"),
     recentCount: document.querySelector("#recent-count"),
     modelsList: document.querySelector("#models-list"),
+    modelsCount: document.querySelector("#models-count"),
     lifetimeTokens: document.querySelector("#lifetime-tokens"),
     lifetimeRequests: document.querySelector("#lifetime-requests"),
     lifetimeCost: document.querySelector("#lifetime-cost"),
@@ -94,10 +114,26 @@
 
   const initialRange = new URLSearchParams(window.location.search).get("range");
   const initialSource = new URLSearchParams(window.location.search).get("source");
+  const initialChartWindow = (() => {
+    try {
+      const value = window.localStorage.getItem(CHART_WINDOW_STORAGE_KEY);
+      return VALID_CHART_WINDOWS.has(value) ? value : "all";
+    } catch {
+      return "all";
+    }
+  })();
+  const initialPreciseNumbers = (() => {
+    try {
+      return window.localStorage.getItem(PRECISE_NUMBERS_STORAGE_KEY) === "true";
+    } catch {
+      return false;
+    }
+  })();
   const state = {
     range: VALID_RANGES.has(initialRange) ? initialRange : "today",
     source: VALID_SOURCES.has(initialSource) ? initialSource : "auto",
     chartMode: "tokens",
+    chartWindow: initialChartWindow,
     chartSelectedIndex: -1,
     chartSelectedTime: "",
     chartLayout: null,
@@ -105,6 +141,9 @@
     backendBusy: false,
     backendFetchId: 0,
     backendRestartTimer: null,
+    autostart: null,
+    autostartBusy: false,
+    autostartFetchId: 0,
     data: null,
     fetchId: 0,
     controller: null,
@@ -115,7 +154,8 @@
     streamRefreshTimer: null,
     toastTimer: null,
     settings: null,
-    settingsBusy: false
+    settingsBusy: false,
+    preciseNumbers: initialPreciseNumbers
   };
 
   function asNumber(value) {
@@ -177,7 +217,9 @@
       ? control.availableActions.filter((action) => action === "restart" || action === "stop")
       : [];
     return {
-      status: root.status === "stopping" ? "stopping" : "running",
+      status: ["stopping", "stopped"].includes(root.status) ? root.status : "running",
+      instanceId: asText(root.instanceId),
+      processId: asText(root.processId ?? root.pid),
       bindHost: asText(root.bindHost),
       port: asNumber(root.port),
       startedAt: asText(root.startedAt),
@@ -187,6 +229,22 @@
         availableActions: actions,
         startSupported: Boolean(control.startSupported)
       }
+    };
+  }
+
+  function normalizeAutostart(payload) {
+    const root = payload && typeof payload === "object" ? payload : {};
+    const mode = asText(root.mode) === "cc-switch" ? "cc-switch" : "always";
+    return {
+      supported: Boolean(root.supported ?? Object.hasOwn(root, "enabled")),
+      enabled: Boolean(root.enabled),
+      mode,
+      detail: asText(root.detail ?? root.message),
+      availableModes: Array.isArray(root.availableModes)
+        ? root.availableModes
+          .map((item) => typeof item === "string" ? item : asText(item?.id))
+          .filter(Boolean)
+        : []
     };
   }
 
@@ -209,6 +267,17 @@
     return new Intl.NumberFormat("zh-CN", { maximumFractionDigits }).format(value);
   }
 
+  function formatExact(value, maximumFractionDigits = 2) {
+    if (value === null || !Number.isFinite(value)) return "--";
+    return new Intl.NumberFormat("zh-CN", { maximumFractionDigits }).format(value);
+  }
+
+  function formatQuantity(value, maximumFractionDigits = 1) {
+    return state.preciseNumbers
+      ? formatExact(value, maximumFractionDigits)
+      : formatCompact(value, maximumFractionDigits);
+  }
+
   function formatInteger(value) {
     if (value === null || !Number.isFinite(value)) return "--";
     return new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 0 }).format(value);
@@ -228,6 +297,7 @@
 
   function formatLatency(value) {
     if (value === null || !Number.isFinite(value)) return "--";
+    if (state.preciseNumbers) return `${formatExact(value, 2)}ms`;
     if (value >= 1000) return `${formatCompact(value / 1000, 1)}s`;
     return `${formatInteger(value)}ms`;
   }
@@ -290,6 +360,29 @@
     element.textContent = text;
     element.classList.toggle("fit-sm", text.length >= 9);
     element.classList.toggle("fit-xs", text.length >= 13);
+  }
+
+  function syncValueToggleAccessibility() {
+    const label = state.preciseNumbers ? "点击切换为紧凑数值" : "点击切换为精确数值";
+    document.querySelectorAll("[data-value]").forEach((item) => {
+      item.setAttribute("role", "button");
+      item.setAttribute("tabindex", "0");
+      item.setAttribute("aria-pressed", String(state.preciseNumbers));
+      item.setAttribute("aria-label", `${item.textContent || "数据"}，${label}`);
+      item.title = label;
+    });
+  }
+
+  function togglePreciseNumbers() {
+    state.preciseNumbers = !state.preciseNumbers;
+    try {
+      window.localStorage.setItem(PRECISE_NUMBERS_STORAGE_KEY, String(state.preciseNumbers));
+    } catch {
+      // The current page stays usable when private browsing blocks persistent storage.
+    }
+    if (state.data) renderDashboard(state.data);
+    syncValueToggleAccessibility();
+    showToast(state.preciseNumbers ? "已显示精确数值" : "已显示紧凑数值");
   }
 
   function element(tag, className, text) {
@@ -520,14 +613,14 @@
   }
 
   function renderSummary(summary) {
-    setMetric(dom.token, formatCompact(summary.tokens, 1));
+    setMetric(dom.token, formatQuantity(summary.tokens, 1));
     setMetric(dom.cost, formatMoney(summary.cost));
-    setMetric(dom.requests, formatCompact(summary.requests, 1));
+    setMetric(dom.requests, formatQuantity(summary.requests, 1));
     setMetric(dom.latency, formatLatency(summary.avgLatencyMs));
-    setMetric(dom.rpm, formatCompact(summary.rpm, 1));
-    setMetric(dom.tpm, formatCompact(summary.tpm, 1));
+    setMetric(dom.rpm, formatQuantity(summary.rpm, 1));
+    setMetric(dom.tpm, formatQuantity(summary.tpm, 1));
     setMetric(dom.success, formatRate(summary.successRate));
-    setMetric(dom.keys, formatCompact(summary.activeKeys, 1));
+    setMetric(dom.keys, formatQuantity(summary.activeKeys, 1));
 
     const rate = normalizeRate(summary.successRate);
     dom.successNote.textContent = rate === null
@@ -616,50 +709,127 @@
     dom.sourceStrip.hidden = false;
   }
 
+  function backendAddress(backend) {
+    if (!backend) return "--";
+    const host = backend.bindHost || "未知地址";
+    return backend.port === null ? host : `${host}:${backend.port}`;
+  }
+
+  function formatBackendStartedAt(value) {
+    const date = parseDate(value);
+    if (!date) return "--";
+    return new Intl.DateTimeFormat("zh-CN", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false
+    }).format(date);
+  }
+
+  function setBackendManagementStatus(message, tone = "") {
+    dom.backendStatus.textContent = message;
+    dom.backendStatus.dataset.tone = tone;
+    dom.backendStatus.hidden = !message;
+  }
+
+  function syncAutostartControls() {
+    const available = state.autostart?.supported === true;
+    const enabled = available && state.autostart?.enabled === true;
+    const busy = state.autostartBusy;
+    dom.autostartEnabled.disabled = !available || busy;
+    dom.autostartModeField.disabled = !enabled || busy;
+    const ccSwitchAllowed = !state.autostart?.availableModes?.length
+      || state.autostart.availableModes.includes("cc-switch");
+    const ccSwitch = dom.backendForm.querySelector('input[name="autostartMode"][value="cc-switch"]');
+    if (ccSwitch) ccSwitch.disabled = !enabled || busy || !ccSwitchAllowed;
+  }
+
+  function renderAutostart(autostart) {
+    if (!autostart) {
+      dom.autostartEnabled.checked = false;
+      dom.autostartDetail.textContent = "暂时无法读取开机自启设置";
+      syncAutostartControls();
+      return;
+    }
+
+    dom.autostartEnabled.checked = autostart.enabled;
+    const modeInput = dom.backendForm.querySelector(`input[name="autostartMode"][value="${autostart.mode}"]`);
+    if (modeInput) modeInput.checked = true;
+    dom.autostartDetail.textContent = autostart.supported
+      ? (autostart.detail || (autostart.enabled ? "已启用" : "未启用"))
+      : (autostart.detail || "当前系统不支持开机自启管理");
+    syncAutostartControls();
+  }
+
+  function renderBackendDialog(backend) {
+    const stateLabel = backend?.status === "stopped"
+      ? "后端服务已关闭"
+      : backend?.status === "stopping"
+        ? "正在关闭或重启"
+        : backend ? "后端服务运行中" : "后端状态不可用";
+    const stateKind = backend?.status === "stopped"
+      ? "stopped"
+      : backend?.status === "stopping" ? "stopping" : backend ? "running" : "error";
+    const canControl = backend?.status === "running"
+      && backend.control?.enabled
+      && Array.isArray(backend.control.availableActions);
+
+    dom.backendDialogState.dataset.state = stateKind;
+    dom.backendDialogTitle.textContent = stateLabel;
+    dom.backendDialogSummary.textContent = backend?.status === "stopped"
+      ? "已关闭；请在电脑端启动监控服务。"
+      : backend
+        ? `${backendAddress(backend)} · ${formatUptime(backend.uptimeSeconds)}${backend.control?.enabled ? "" : " · 控制需要面板密码"}`
+        : "请确认本机服务正在运行，并已完成面板登录。";
+    dom.backendAddress.textContent = backendAddress(backend);
+    dom.backendUptime.textContent = backend ? formatUptime(backend.uptimeSeconds) : "--";
+    dom.backendStartedAt.textContent = backend ? formatBackendStartedAt(backend.startedAt) : "--";
+    dom.backendProcessId.textContent = backend?.processId || "--";
+    dom.backendInstanceId.textContent = backend?.instanceId || "--";
+    dom.backendRestart.disabled = !(canControl && backend.control.availableActions.includes("restart")) || state.backendBusy;
+    dom.backendStop.disabled = !(canControl && backend.control.availableActions.includes("stop")) || state.backendBusy;
+    dom.backendForm.setAttribute("aria-busy", String(state.backendBusy || state.autostartBusy));
+  }
+
   function renderBackend(backend) {
     if (!backend) {
       dom.backendState.dataset.state = "error";
       dom.backendDetail.textContent = "暂时无法读取后端状态";
-      dom.backendRestart.disabled = true;
-      dom.backendStop.disabled = true;
+      dom.backendState.setAttribute("aria-label", "后端状态不可用");
+      renderBackendDialog(null);
       return;
     }
 
     const stateLabel = backend.status === "stopped"
-      ? "服务已关闭"
-      : backend.status === "stopping"
-        ? "正在关闭或重启"
-        : "后端服务运行中";
-    const host = backend.bindHost || "未知地址";
-    const port = backend.port === null ? "" : `:${backend.port}`;
-    const address = `${host}${port}`;
-    const canControl = backend.status === "running"
-      && backend.control?.enabled
-      && Array.isArray(backend.control.availableActions);
-    const canRestart = canControl && backend.control.availableActions.includes("restart") && !state.backendBusy;
-    const canStop = canControl && backend.control.availableActions.includes("stop") && !state.backendBusy;
-
+      ? "后端服务已关闭"
+      : backend.status === "stopping" ? "正在关闭或重启" : "后端服务运行中";
     dom.backendState.dataset.state = backend.status;
     dom.backendDetail.textContent = backend.status === "stopped"
       ? "已关闭；请在电脑端启动监控服务"
       : backend.status === "stopping"
-        ? `正在处理请求 · ${address}`
-        : `${address} · ${formatUptime(backend.uptimeSeconds)}${backend.control?.enabled ? "" : " · 控制需要面板密码"}`;
+        ? `正在处理请求 · ${backendAddress(backend)}`
+        : `${backendAddress(backend)} · ${formatUptime(backend.uptimeSeconds)}${backend.control?.enabled ? "" : " · 控制需要面板密码"}`;
     dom.backendState.setAttribute("aria-label", `${stateLabel}，${dom.backendDetail.textContent}`);
-    dom.backendRestart.disabled = !canRestart;
-    dom.backendStop.disabled = !canStop;
+    renderBackendDialog(backend);
   }
 
   function setBackendBusy(busy) {
     state.backendBusy = busy;
-    dom.backendActions.dataset.busy = String(busy);
-    dom.backendRestart.classList.toggle("is-spinning", busy);
     renderBackend(state.backend);
+  }
+
+  function setAutostartBusy(busy) {
+    state.autostartBusy = busy;
+    renderAutostart(state.autostart);
+    renderBackendDialog(state.backend);
   }
 
   function renderRecent(recent) {
     const rows = recent.slice(0, MAX_RECENT_ROWS);
-    dom.recentCount.textContent = `${formatInteger(recent.length)} 条`;
+    dom.recentCount.textContent = `显示 ${formatInteger(rows.length)} 条`;
     dom.recentList.replaceChildren();
 
     if (rows.length === 0) {
@@ -687,7 +857,7 @@
       model.title = model.textContent;
       const totalTokens = asNumber(call.totalTokens)
         ?? ((asNumber(call.inputTokens) ?? 0) + (asNumber(call.outputTokens) ?? 0));
-      const tokens = element("span", "call-tokens", `${formatCompact(totalTokens, 1)} Token`);
+      const tokens = element("span", "call-tokens", `${formatQuantity(totalTokens, 1)} Token`);
       const latency = element("span", "call-latency", formatLatency(asNumber(call.latencyMs)));
       meta.append(time, model, tokens, latency);
 
@@ -707,13 +877,14 @@
   function renderModels(models) {
     const rows = models.slice(0, MAX_MODEL_ROWS);
     dom.modelsList.replaceChildren();
+    dom.modelsCount.textContent = rows.length ? `TOP ${rows.length}` : "TOP --";
 
     if (rows.length === 0) {
       dom.modelsList.append(element("li", "list-placeholder", "当前范围暂无模型数据"));
       return;
     }
 
-    const tokenTotal = rows.reduce((sum, item) => sum + (asNumber(item.tokens) ?? 0), 0);
+    const tokenTotal = models.reduce((sum, item) => sum + (asNumber(item.tokens) ?? 0), 0);
     rows.forEach((model, index) => {
       let share = asNumber(model.share);
       if (share === null) share = tokenTotal > 0 ? ((asNumber(model.tokens) ?? 0) / tokenTotal) * 100 : 0;
@@ -733,12 +904,13 @@
       const bar = element("div", "model-bar");
       const fill = element("span");
       fill.style.setProperty("--share", `${share}%`);
+      fill.setAttribute("aria-label", `${formatRate(share)} 占比`);
       bar.append(fill);
 
       const values = element("div", "model-values");
       values.append(
-        element("span", "", `${formatCompact(asNumber(model.tokens), 1)} Token`),
-        element("span", "", `${formatCompact(asNumber(model.requests), 1)} 次`),
+        element("span", "", `${formatQuantity(asNumber(model.tokens), 1)} Token`),
+        element("span", "", `${formatQuantity(asNumber(model.requests), 1)} 次`),
         element("span", "", formatMoney(asNumber(model.cost)))
       );
       row.append(top, bar, values);
@@ -747,9 +919,9 @@
   }
 
   function renderLifetime(lifetime) {
-    setMetric(dom.lifetimeTokens, formatCompact(lifetime.tokens, 2));
-    setMetric(dom.lifetimeRequests, formatCompact(lifetime.requests, 1));
-    setMetric(dom.lifetimeCost, formatMoney(lifetime.cost, true));
+    setMetric(dom.lifetimeTokens, formatQuantity(lifetime.tokens, 2));
+    setMetric(dom.lifetimeRequests, formatQuantity(lifetime.requests, 1));
+    setMetric(dom.lifetimeCost, formatMoney(lifetime.cost, !state.preciseNumbers));
   }
 
   function trendPointLabel(point) {
@@ -761,7 +933,45 @@
     const requests = asNumber(point?.requests) ?? 0;
     const cost = asNumber(point?.cost) ?? 0;
     const latency = asNumber(point?.avgLatencyMs) ?? 0;
-    return `${trendPointLabel(point)} · ${formatInteger(tokens)} Token · ${formatInteger(requests)} 请求 · ${formatMoney(cost)} · 平均 ${formatLatency(latency)}`;
+    return `${trendPointLabel(point)} · ${formatQuantity(tokens, 1)} Token · ${formatQuantity(requests, 1)} 请求 · ${formatMoney(cost)} · 平均 ${formatLatency(latency)}`;
+  }
+
+  function trendTimeline() {
+    const timeline = state.data?.timeline ?? [];
+    if (state.chartWindow === "all" || timeline.length === 0) return timeline;
+    const windowHours = Number.parseInt(state.chartWindow, 10);
+    if (!Number.isFinite(windowHours) || windowHours <= 0) return timeline;
+
+    const timestamps = timeline
+      .map((point) => parseDate(point?.timestamp ?? point?.time)?.getTime())
+      .filter((timestamp) => Number.isFinite(timestamp));
+    if (timestamps.length === 0) return timeline;
+    const latest = Math.max(...timestamps);
+    const cutoff = latest - windowHours * 3_600_000 + 1;
+    return timeline.filter((point) => {
+      const timestamp = parseDate(point?.timestamp ?? point?.time)?.getTime();
+      return Number.isFinite(timestamp) && timestamp >= cutoff;
+    });
+  }
+
+  function syncChartWindowButtons() {
+    document.querySelectorAll("[data-chart-window]").forEach((button) => {
+      button.setAttribute("aria-pressed", String(button.dataset.chartWindow === state.chartWindow));
+    });
+  }
+
+  function selectChartWindow(windowName) {
+    if (!VALID_CHART_WINDOWS.has(windowName) || windowName === state.chartWindow) return;
+    state.chartWindow = windowName;
+    state.chartSelectedIndex = -1;
+    state.chartSelectedTime = "";
+    try {
+      window.localStorage.setItem(CHART_WINDOW_STORAGE_KEY, windowName);
+    } catch {
+      // A chart window remains active for this page even when it cannot be persisted.
+    }
+    syncChartWindowButtons();
+    drawTrend();
   }
 
   function syncTrendSelection(timeline) {
@@ -802,7 +1012,7 @@
   }
 
   function selectTrendPoint(index) {
-    const timeline = state.data?.timeline ?? [];
+    const timeline = trendTimeline();
     if (timeline.length === 0) return;
     const selectedIndex = Math.max(0, Math.min(timeline.length - 1, index));
     state.chartSelectedIndex = selectedIndex;
@@ -840,10 +1050,10 @@
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
     context.clearRect(0, 0, width, height);
 
-    const timeline = state.data?.timeline ?? [];
+    const timeline = trendTimeline();
     const mode = state.chartMode;
     const values = timeline.map((point) => asNumber(point?.[mode]) ?? 0);
-    const formatter = mode === "tokens" ? formatCompact : formatInteger;
+    const formatter = formatQuantity;
     const modeLabel = mode === "tokens" ? "Token" : "请求";
     const selectedIndex = syncTrendSelection(timeline);
 
@@ -947,6 +1157,7 @@
     dom.updatedAt.textContent = formatUpdatedAt(data.generatedAt);
     dom.body.classList.remove("initial-loading");
     applyRangeLabels();
+    syncValueToggleAccessibility();
   }
 
   async function fetchBackendStatus() {
@@ -984,6 +1195,7 @@
       if (backend?.status === "running") {
         setBackendBusy(false);
         void fetchDashboard();
+        void fetchAutostartStatus();
         return;
       }
       if (attempt + 1 < BACKEND_RESTART_MAX_ATTEMPTS) {
@@ -1031,6 +1243,7 @@
 
       if (!restart) {
         setBackendBusy(false);
+        setBackendManagementStatus("已请求关闭服务", "success");
         return;
       }
 
@@ -1044,6 +1257,92 @@
     } finally {
       window.clearTimeout(timeout);
     }
+  }
+
+  async function fetchAutostartStatus() {
+    const fetchId = ++state.autostartFetchId;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), BACKEND_REQUEST_TIMEOUT_MS);
+    try {
+      const response = await fetch("/api/autostart", {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+        signal: controller.signal
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const autostart = normalizeAutostart(await response.json());
+      if (fetchId !== state.autostartFetchId) return null;
+      state.autostart = autostart;
+      renderAutostart(autostart);
+      return autostart;
+    } catch {
+      if (fetchId !== state.autostartFetchId || state.autostartBusy) return null;
+      state.autostart = null;
+      renderAutostart(null);
+      return null;
+    } finally {
+      window.clearTimeout(timeout);
+    }
+  }
+
+  function selectedAutostartMode() {
+    return dom.backendForm.querySelector('input[name="autostartMode"]:checked')?.value === "cc-switch"
+      ? "cc-switch"
+      : "always";
+  }
+
+  async function updateAutostart(enabled, mode) {
+    if (state.autostartBusy || state.autostart?.supported !== true) return;
+    const previous = state.autostart;
+    state.autostart = { ...previous, enabled, mode };
+    setAutostartBusy(true);
+    setBackendManagementStatus("正在保存开机自启设置");
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), BACKEND_REQUEST_TIMEOUT_MS);
+    try {
+      const response = await fetch("/api/autostart", {
+        method: "PUT",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ enabled, mode }),
+        signal: controller.signal
+      });
+      if (!response.ok) {
+        if (response.status === 403) throw new Error("开机自启管理需要先设置面板密码");
+        if (response.status === 401) throw new Error("面板密码不正确或已失效");
+        throw new Error(`HTTP ${response.status}`);
+      }
+      state.autostart = normalizeAutostart(await response.json());
+      renderAutostart(state.autostart);
+      setBackendManagementStatus("开机自启设置已保存", "success");
+    } catch (error) {
+      setBackendManagementStatus(
+        error instanceof DOMException && error.name === "AbortError"
+          ? "保存开机自启设置超时"
+          : error instanceof Error ? error.message : "无法保存开机自启设置",
+        "error"
+      );
+      state.autostart = previous;
+      setAutostartBusy(false);
+      await fetchAutostartStatus();
+    } finally {
+      window.clearTimeout(timeout);
+      if (state.autostartBusy) setAutostartBusy(false);
+    }
+  }
+
+  async function openBackendManagement() {
+    setBackendManagementStatus("");
+    if (!dom.backendDialog.open) dom.backendDialog.showModal();
+    await Promise.all([fetchBackendStatus(), fetchAutostartStatus()]);
+  }
+
+  function closeBackendManagement() {
+    if (state.backendBusy || state.autostartBusy) return;
+    if (dom.backendDialog.open) dom.backendDialog.close();
   }
 
   async function fetchDashboard({ announce = false, initial = false } = {}) {
@@ -1196,9 +1495,20 @@
         drawTrend();
       });
     });
+    document.querySelectorAll("[data-chart-window]").forEach((button) => {
+      button.addEventListener("click", () => selectChartWindow(button.dataset.chartWindow));
+    });
+    document.querySelectorAll("[data-value]").forEach((item) => {
+      item.addEventListener("click", togglePreciseNumbers);
+      item.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        togglePreciseNumbers();
+      });
+    });
     dom.canvas.addEventListener("click", (event) => selectTrendPointAtClientX(event.clientX));
     dom.canvas.addEventListener("keydown", (event) => {
-      const timeline = state.data?.timeline ?? [];
+      const timeline = trendTimeline();
       if (timeline.length === 0) return;
       let nextIndex = state.chartSelectedIndex;
       if (event.key === "ArrowLeft") nextIndex -= 1;
@@ -1209,8 +1519,21 @@
       event.preventDefault();
       selectTrendPoint(nextIndex);
     });
+    dom.backendMenu.addEventListener("click", () => void openBackendManagement());
+    dom.backendClose.addEventListener("click", closeBackendManagement);
     dom.backendRestart.addEventListener("click", () => void requestBackendAction("restart"));
     dom.backendStop.addEventListener("click", () => void requestBackendAction("stop"));
+    dom.autostartEnabled.addEventListener("change", () => {
+      void updateAutostart(dom.autostartEnabled.checked, selectedAutostartMode());
+    });
+    dom.backendForm.querySelectorAll('input[name="autostartMode"]').forEach((input) => {
+      input.addEventListener("change", () => {
+        if (input.checked) void updateAutostart(dom.autostartEnabled.checked, selectedAutostartMode());
+      });
+    });
+    dom.backendDialog.addEventListener("click", (event) => {
+      if (event.target === dom.backendDialog) closeBackendManagement();
+    });
     dom.refresh.addEventListener("click", () => fetchDashboard({ announce: true }));
     dom.retry.addEventListener("click", () => fetchDashboard({ announce: true }));
     dom.settingsButton.addEventListener("click", openSettings);
@@ -1289,6 +1612,8 @@
   }
 
   applyRangeLabels();
+  syncChartWindowButtons();
+  syncValueToggleAccessibility();
   registerInteractions();
   setupInstallPrompt();
   registerServiceWorker();
