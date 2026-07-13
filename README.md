@@ -176,8 +176,8 @@ Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8787/api/events `
 双击 `构建安卓小组件.cmd`，在窗口中审阅并确认 Android SDK 许可证；脚本会安装 SDK 35
 并生成和验证 `android-widget/app/build/outputs/apk/release/app-release.apk`。它会保存本机私有
 签名信息，确保后续版本可覆盖更新。签名备份和“签名不一致”的处理步骤见
-[android-widget/SIGNING.md](android-widget/SIGNING.md)。小组件按照 Android
-通常的 30 分钟最短周期轮询，也支持手动刷新。组件目标为 `4 x 5`，点击组件主体会进入
+[android-widget/SIGNING.md](android-widget/SIGNING.md)。小组件使用网络约束的 WorkManager
+按 Android 允许的最短 30 分钟周期刷新，覆盖安装后会补一次刷新，也支持手动刷新；省电策略可能延后后台任务。组件目标为 `4 x 5`，点击组件主体会进入
 原生 Material Design 3 仪表盘，其中包含网页面板的核心指标、数据源/时间范围、趋势、
 最近调用、模型排行和累计总览；不会跳转到浏览器。
 

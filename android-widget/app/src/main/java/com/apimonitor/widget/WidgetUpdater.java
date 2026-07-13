@@ -39,18 +39,30 @@ final class WidgetUpdater {
 
     static void updateAll(Context context, int[] widgetIds, Runnable finished) {
         Runnable boundedFinished = boundedFinish(finished);
+        updateAllWithoutBroadcastBudget(context, widgetIds, boundedFinished);
+        // A queued widget must not keep the system broadcast open indefinitely.
+        MAIN.postDelayed(boundedFinished, BROADCAST_BUDGET_MS);
+    }
+
+    /**
+     * WorkManager owns a longer background execution window, so it must wait for every widget
+     * instead of applying the short BroadcastReceiver watchdog used by {@link #updateAll}.
+     */
+    static void updateAllForWorker(Context context, int[] widgetIds, Runnable finished) {
+        updateAllWithoutBroadcastBudget(context, widgetIds, finished);
+    }
+
+    private static void updateAllWithoutBroadcastBudget(Context context, int[] widgetIds, Runnable finished) {
         if (widgetIds == null || widgetIds.length == 0) {
-            boundedFinished.run();
+            finished.run();
             return;
         }
         AtomicInteger remaining = new AtomicInteger(widgetIds.length);
         for (int widgetId : widgetIds) {
             updateAsync(context, widgetId, () -> {
-                if (remaining.decrementAndGet() == 0) boundedFinished.run();
+                if (remaining.decrementAndGet() == 0) finished.run();
             });
         }
-        // A queued widget must not keep the system broadcast open indefinitely.
-        MAIN.postDelayed(boundedFinished, BROADCAST_BUDGET_MS);
     }
 
     /** Starts one refresh while guaranteeing that its BroadcastReceiver can finish on time. */

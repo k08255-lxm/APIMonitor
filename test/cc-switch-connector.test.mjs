@@ -144,4 +144,36 @@ describe('cc-switch connector', () => {
       assert.equal(connector.id, 'cc-switch');
     }
   });
+
+  it('returns the latest 50 effective calls instead of truncating the app history to five', async (t) => {
+    const directory = await mkdtemp(join(tmpdir(), 'api-monitor-cc-switch-recent-'));
+    const databasePath = join(directory, 'cc-switch.db');
+    t.after(() => rm(directory, { recursive: true, force: true }));
+    createFixture(databasePath);
+
+    const database = new DatabaseSync(databasePath);
+    const insert = database.prepare(`
+      INSERT INTO proxy_request_logs (
+        request_id, provider_id, app_type, model, request_model,
+        input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens,
+        total_cost_usd, latency_ms, duration_ms, status_code, is_streaming,
+        created_at, data_source
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    const nowSeconds = Math.floor(Date.now() / 1_000);
+    for (let index = 0; index < 51; index += 1) {
+      insert.run(
+        `recent-batch-${index}`, 'provider-b', 'claude', 'claude-sonnet', 'claude-sonnet',
+        1, 1, 0, 0, '0', 1, 1, 200, 0, nowSeconds - 1_000 - index, 'proxy',
+      );
+    }
+    database.close();
+
+    const connector = await createCcSwitchConnector({ dbPath: databasePath });
+    const result = await connector.refresh('7d');
+
+    assert.equal(result.recent.length, 50);
+    assert.ok(result.recent.some((item) => item.id === 'recent-batch-47'));
+    assert.equal(result.recent.some((item) => item.id === 'recent-batch-48'), false);
+  });
 });

@@ -1,5 +1,7 @@
 package com.apimonitor.widget;
 
+import android.appwidget.AppWidgetManager;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.SharedPreferences;
 
@@ -89,6 +91,39 @@ final class WidgetPrefs {
                 .remove(key(widgetId, URL))
                 .remove(key(widgetId, PASSWORD))
                 .remove(key(widgetId, REFRESH_TOKEN))
+                .remove(key(widgetId, LAST_UPDATED))
+                .apply();
+    }
+
+    /**
+     * Keep widgets that were seeded from the app connection in sync without overwriting an
+     * instance that has deliberately been configured with a different monitor endpoint.
+     */
+    static void syncDashboardBackedWidgets(
+            Context context,
+            DashboardPrefs.Config previous,
+            DashboardPrefs.Config replacement
+    ) {
+        if (replacement == null || !replacement.isConfigured()) return;
+        Context appContext = context.getApplicationContext();
+        AppWidgetManager manager = AppWidgetManager.getInstance(appContext);
+        int[] widgetIds = manager.getAppWidgetIds(new ComponentName(appContext, MonitorWidgetProvider.class));
+        for (int widgetId : widgetIds) {
+            Config widget = load(appContext, widgetId);
+            boolean matchesPrevious = previous != null
+                    && previous.isConfigured()
+                    && widget.baseUrl.equals(previous.baseUrl)
+                    && widget.password.equals(previous.password);
+            if (!widget.isConfigured() || matchesPrevious) {
+                updateConnection(appContext, widgetId, replacement.baseUrl, replacement.password);
+            }
+        }
+    }
+
+    private static void updateConnection(Context context, int widgetId, String baseUrl, String password) {
+        preferences(context).edit()
+                .putString(key(widgetId, URL), baseUrl)
+                .putString(key(widgetId, PASSWORD), password)
                 .remove(key(widgetId, LAST_UPDATED))
                 .apply();
     }

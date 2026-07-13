@@ -14,6 +14,23 @@ function envelope(data) {
   return { code: 0, message: 'success', data };
 }
 
+function recentUsageItems() {
+  return Array.from({ length: 50 }, (_, index) => ({
+    id: 91 + index,
+    request_id: `req-${91 + index}`,
+    model: 'gpt-5.5',
+    input_tokens: 120,
+    output_tokens: 30,
+    total_cost: 0.04,
+    actual_cost: 0.03,
+    duration_ms: 250,
+    stream: true,
+    created_at: `2026-07-12T07:${String(59 - index).padStart(2, '0')}:00.000Z`,
+    api_key: { id: 7, name: 'mobile' },
+    account: { id: 4, name: 'OpenAI primary' },
+  }));
+}
+
 describe('Sub2API connector', () => {
   it('maps the real admin snapshot and recent-log contracts without leaking the admin key', async (t) => {
     const adminKey = 'sub2api-admin-private-key';
@@ -63,23 +80,10 @@ describe('Sub2API connector', () => {
 
       if (url.pathname === '/api/v1/admin/usage') {
         return jsonResponse(envelope({
-          items: [{
-            id: 91,
-            request_id: 'req-91',
-            model: 'gpt-5.5',
-            input_tokens: 120,
-            output_tokens: 30,
-            total_cost: 0.04,
-            actual_cost: 0.03,
-            duration_ms: 250,
-            stream: true,
-            created_at: '2026-07-12T07:59:00.000Z',
-            api_key: { id: 7, name: 'mobile' },
-            account: { id: 4, name: 'OpenAI primary' },
-          }],
-          total: 1,
+          items: recentUsageItems(),
+          total: 50,
           page: 1,
-          page_size: 5,
+          page_size: 50,
           pages: 1,
         }));
       }
@@ -103,7 +107,7 @@ describe('Sub2API connector', () => {
     assert.equal(snapshotCall.url.searchParams.get('include_stats'), 'true');
     assert.equal(snapshotCall.url.searchParams.get('include_model_stats'), 'true');
     const recentCall = calls.find((call) => call.url.pathname.endsWith('/usage'));
-    assert.equal(recentCall.url.searchParams.get('page_size'), '5');
+    assert.equal(recentCall.url.searchParams.get('page_size'), '50');
 
     assert.deepEqual(result.summary, {
       tokens: 150,
@@ -121,6 +125,8 @@ describe('Sub2API connector', () => {
     assert.equal(result.recent[0].keyId, 'mobile');
     assert.equal(result.recent[0].tokens, 150);
     assert.equal(result.recent[0].stream, true);
+    assert.equal(result.recent.length, 50);
+    assert.equal(result.recent.at(-1).id, '140');
     assert.equal(JSON.stringify(result).includes(adminKey), false);
   });
 
@@ -157,7 +163,7 @@ describe('Sub2API connector', () => {
         }));
       }
       if (url.pathname === '/api/v1/usage') {
-        return jsonResponse(envelope({ items: [], total: 0, page: 1, page_size: 5, pages: 1 }));
+        return jsonResponse(envelope({ items: [], total: 0, page: 1, page_size: 50, pages: 1 }));
       }
       throw new Error(`Unexpected user-scoped URL: ${url}`);
     };

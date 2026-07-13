@@ -3,6 +3,7 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- HTTP is permitted only so a trusted private-LAN monitor can be used.
@@ -58,5 +59,14 @@
         <receiver
             android:name=".WidgetRefreshReceiver"
             android:exported="false" />
+
+        <!-- Recreates the periodic refresh after this package is upgraded. -->
+        <receiver
+            android:name=".WidgetRefreshScheduleReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

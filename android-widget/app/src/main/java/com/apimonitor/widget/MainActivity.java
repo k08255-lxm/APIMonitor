@@ -124,6 +124,7 @@ public final class MainActivity extends ComponentActivity {
         trendRangeGroup.check(trendRangeButtonId(trendWindow));
         bindActions();
         bindNumberModeToggles();
+        WidgetRefreshScheduler.ensureScheduled(this);
 
         configurationRequest = getIntent().hasExtra(AppWidgetManager.EXTRA_APPWIDGET_ID);
         if (configurationRequest) {
@@ -817,9 +818,12 @@ public final class MainActivity extends ComponentActivity {
     }
 
     private void saveConnection(String baseUrl, String password, boolean pinAfterSave) {
+        DashboardPrefs.Config previous = DashboardPrefs.load(this);
         DashboardPrefs.saveConnection(this, baseUrl, password);
         if (settingsDialog != null) settingsDialog.dismiss();
         DashboardPrefs.Config config = DashboardPrefs.load(this);
+        WidgetPrefs.syncDashboardBackedWidgets(this, previous, config);
+        WidgetRefreshScheduler.requestImmediateRefresh(this);
         Toast.makeText(this, R.string.dashboard_connection_saved, Toast.LENGTH_SHORT).show();
         if (configurationRequest) {
             completeWidgetConfiguration(config);
@@ -837,6 +841,7 @@ public final class MainActivity extends ComponentActivity {
             return;
         }
         WidgetPrefs.save(this, widgetId, config.baseUrl, config.password);
+        WidgetRefreshScheduler.ensureScheduled(this);
         WidgetUpdater.update(this, widgetId);
         Intent result = new Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId);
         setResult(RESULT_OK, result);
