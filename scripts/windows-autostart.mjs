@@ -3,6 +3,9 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const DEFAULT_WSCRIPT_PATH = process.platform === 'win32'
+  ? resolve(process.env.SystemRoot || process.env.WINDIR || 'C:\\Windows', 'System32', 'wscript.exe')
+  : 'wscript.exe';
 
 export const WINDOWS_RUN_KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run';
 export const WINDOWS_RUN_VALUE = 'APIMonitor';
@@ -37,25 +40,46 @@ function normaliseWindowsPath(value) {
 function quoteWindowsArgument(value) {
   // The command only contains application-controlled executable and script
   // paths. Quoting still protects spaces in a user profile or Node install.
-  return `"${String(value).replaceAll('"', '\\"')}"`;
+  const text = String(value);
+  if (text.includes('"')) throw new RangeError('Windows startup paths must not contain quotes');
+  return `"${text}"`;
 }
 
-function commandForMode(mode, { nodePath, launcherPath, watcherPath }) {
+function commandForMode(mode, { nodePath, hiddenLauncherPath, wscriptPath }) {
+  if (mode === 'always' || mode === 'cc-switch') {
+    return [
+      quoteWindowsArgument(wscriptPath),
+      '//B',
+      '//NoLogo',
+      quoteWindowsArgument(hiddenLauncherPath),
+      quoteWindowsArgument(nodePath),
+      mode,
+    ].join(' ');
+  }
+  throw new RangeError('mode must be off, always, or cc-switch');
+}
+
+function legacyCommandForMode(mode, { nodePath, launcherPath, watcherPath }) {
   if (mode === 'always') {
     return [quoteWindowsArgument(nodePath), quoteWindowsArgument(launcherPath), '--no-browser'].join(' ');
   }
   if (mode === 'cc-switch') {
     return [quoteWindowsArgument(nodePath), quoteWindowsArgument(watcherPath)].join(' ');
   }
-  throw new RangeError('mode must be off, always, or cc-switch');
+  throw new RangeError('mode must be always or cc-switch');
 }
 
-function classifyCommand(command, { launcherPath, watcherPath }) {
+function sameWindowsCommand(left, right) {
+  return normaliseWindowsPath(left).trim() === normaliseWindowsPath(right).trim();
+}
+
+function classifyCommand(command, paths) {
   if (!command) return 'unknown';
-  const normalized = normaliseWindowsPath(command);
-  if (normalized.includes(normaliseWindowsPath(watcherPath))) return 'cc-switch';
-  if (normalized.includes(normaliseWindowsPath(launcherPath)) && /(?:^|\s)--no-browser(?:\s|$)/u.test(normalized)) {
-    return 'always';
+  for (const mode of ['always', 'cc-switch']) {
+    if (sameWindowsCommand(command, commandForMode(mode, paths))
+        || sameWindowsCommand(command, legacyCommandForMode(mode, paths))) {
+      return mode;
+    }
   }
   return 'unknown';
 }
@@ -142,9 +166,12 @@ export function createWindowsAutostart({
   runCommand = runProcess,
   rootDir = ROOT_DIR,
   nodePath = process.execPath,
+  wscriptPath = DEFAULT_WSCRIPT_PATH,
 } = {}) {
   const launcherPath = resolve(rootDir, 'scripts', 'launch-windows.mjs');
   const watcherPath = resolve(rootDir, 'scripts', 'watch-cc-switch.mjs');
+  const hiddenLauncherPath = resolve(rootDir, 'scripts', 'launch-autostart-hidden.vbs');
+  const commandPaths = { nodePath, launcherPath, watcherPath, hiddenLauncherPath, wscriptPath };
   const supported = platform === 'win32';
 
   async function readEntry() {
@@ -171,7 +198,7 @@ export function createWindowsAutostart({
     } catch {
       registry = registryDetails({ state: 'error', present: false, writable: false });
     }
-    const mode = registry.present ? classifyCommand(registry.command, { launcherPath, watcherPath }) : 'off';
+    const mode = registry.present ? classifyCommand(registry.command, commandPaths) : 'off';
     const detail = descriptionFor(mode, registry.state);
     return {
       supported: true,
@@ -198,7 +225,7 @@ export function createWindowsAutostart({
         if (result?.code !== 0) throw new Error('Unable to remove the current-user Windows startup registry entry');
       }
     } else {
-      const command = commandForMode(mode, { nodePath, launcherPath, watcherPath });
+      const command = commandForMode(mode, commandPaths);
       const result = await runCommand('reg.exe', [
         'add', WINDOWS_RUN_KEY,
         '/v', WINDOWS_RUN_VALUE,
@@ -211,13 +238,39 @@ export function createWindowsAutostart({
     return status();
   }
 
+  async function migrateLegacyEntry() {
+    if (!supported) return supportedStatus();
+    const existing = await readEntry();
+    if (existing.state === 'error') {
+      throw new Error('Unable to read the current-user Windows startup registry entry');
+    }
+    if (existing.present) {
+      const mode = classifyCommand(existing.command, commandPaths);
+      if (mode === 'always' || mode === 'cc-switch') {
+        const currentCommand = commandForMode(mode, commandPaths);
+        if (!sameWindowsCommand(existing.command, currentCommand)) {
+          const result = await runCommand('reg.exe', [
+            'add', WINDOWS_RUN_KEY,
+            '/v', WINDOWS_RUN_VALUE,
+            '/t', 'REG_SZ',
+            '/d', currentCommand,
+            '/f',
+          ]);
+          if (result?.code !== 0) throw new Error('Unable to migrate the Windows startup registry entry');
+        }
+      }
+    }
+    return status();
+  }
+
   return Object.freeze({
     supported,
     status,
     configure,
+    migrateLegacyEntry,
     commandForMode: (mode) => {
       assertMode(mode);
-      return mode === 'off' ? null : commandForMode(mode, { nodePath, launcherPath, watcherPath });
+      return mode === 'off' ? null : commandForMode(mode, commandPaths);
     },
   });
 }

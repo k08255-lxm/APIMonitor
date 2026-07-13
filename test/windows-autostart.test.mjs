@@ -1,4 +1,8 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, it } from 'node:test';
 
 import {
@@ -65,6 +69,7 @@ describe('Windows login startup registry wrapper', () => {
       platform: 'win32',
       rootDir: '/api monitor',
       nodePath: '/node path/node.exe',
+      wscriptPath: '/windows/system32/wscript.exe',
       runCommand: registry.runCommand,
     });
 
@@ -89,6 +94,7 @@ describe('Windows login startup registry wrapper', () => {
       platform: 'win32',
       rootDir: '/api monitor',
       nodePath: '/node path/node.exe',
+      wscriptPath: '/windows/system32/wscript.exe',
       runCommand: registry.runCommand,
     });
 
@@ -108,16 +114,54 @@ describe('Windows login startup registry wrapper', () => {
         '/f',
       ],
     });
-    assert.match(expectedAlwaysCommand, /launch-windows\.mjs/u);
-    assert.match(expectedAlwaysCommand, /--no-browser/u);
+    assert.match(expectedAlwaysCommand, /wscript\.exe/u);
+    assert.match(expectedAlwaysCommand, /\/\/B \/\/NoLogo/u);
+    assert.match(expectedAlwaysCommand, /launch-autostart-hidden\.vbs/u);
+    assert.match(expectedAlwaysCommand, /always$/u);
+    assert.equal(expectedAlwaysCommand.includes('launch-windows.mjs'), false);
 
     const expectedWatcherCommand = manager.commandForMode('cc-switch');
     const watcher = await manager.configure('cc-switch');
     assert.equal(watcher.enabled, true);
     assert.equal(watcher.mode, 'cc-switch');
     assert.equal(watcher.registry.command, expectedWatcherCommand);
-    assert.match(expectedWatcherCommand, /watch-cc-switch\.mjs/u);
+    assert.match(expectedWatcherCommand, /launch-autostart-hidden\.vbs/u);
+    assert.match(expectedWatcherCommand, /cc-switch$/u);
+    assert.equal(expectedWatcherCommand.includes('watch-cc-switch.mjs'), false);
     assert.equal(expectedWatcherCommand.includes('launch-windows.mjs'), false);
+  });
+
+  it('migrates only an owned legacy entry to the silent WScript host', async () => {
+    const rootDir = resolve('/api monitor');
+    const nodePath = resolve('/node path/node.exe');
+    const legacyCommand = `"${nodePath}" "${resolve(rootDir, 'scripts', 'watch-cc-switch.mjs')}"`;
+    const registry = fakeRegistry({ initialCommand: legacyCommand });
+    const manager = createWindowsAutostart({
+      platform: 'win32',
+      rootDir,
+      nodePath,
+      wscriptPath: resolve('/windows/system32/wscript.exe'),
+      runCommand: registry.runCommand,
+    });
+
+    assert.equal((await manager.status()).mode, 'cc-switch');
+    const migrated = await manager.migrateLegacyEntry();
+    assert.equal(migrated.mode, 'cc-switch');
+    assert.equal(migrated.registry.command, manager.commandForMode('cc-switch'));
+    assert.equal(registry.calls.filter(({ args }) => args[0] === 'add').length, 1);
+  });
+
+  it('launches Node with hidden window style and without waiting for it', async () => {
+    const scriptUrl = new URL('../scripts/launch-autostart-hidden.vbs', import.meta.url);
+    const source = await readFile(scriptUrl, 'utf8');
+    assert.match(source, /shell\.Run command, 0, False/u);
+    assert.match(source, /arguments\.Count <> 2/u);
+    if (process.platform === 'win32') {
+      const validation = spawnSync('cscript.exe', [
+        '//B', '//NoLogo', fileURLToPath(scriptUrl), '--validate',
+      ], { windowsHide: true, encoding: 'utf8' });
+      assert.equal(validation.status, 0, validation.stderr || validation.stdout);
+    }
   });
 
   it('removes only the fixed current-user value and rejects unrecognised modes', async () => {

@@ -573,6 +573,14 @@ async function main() {
     return;
   }
 
+  if (process.env.APIMONITOR_SKIP_AUTOSTART_MIGRATION !== '1') {
+    try {
+      await AUTOSTART.migrateLegacyEntry();
+    } catch {
+      console.warn('[monitor] unable to migrate the Windows login startup entry');
+    }
+  }
+
   const store = new EventStore(DATA_FILE);
   await store.init();
   const instanceId = randomUUID();

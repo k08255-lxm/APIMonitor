@@ -25,6 +25,7 @@ async function freePort() {
 function childEnvironment(overrides = {}) {
   return {
     ...process.env,
+    APIMONITOR_SKIP_AUTOSTART_MIGRATION: '1',
     SUB2API_BASE_URL: '',
     SUB2API_ADMIN_KEY: '',
     SUB2API_TOKEN: '',

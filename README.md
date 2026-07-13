@@ -81,9 +81,11 @@ Android App、他人泄露该文件及其中的 token。
 网页“后端管理”和 Android App“后端管理”均可管理当前 Windows 用户的登录启动项。该操作要求已经设置 `DASHBOARD_PASSWORD`，并与“重启/关闭后端”使用相同的 Basic Auth；它只会写入或删除
 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\APIMonitor`，不会创建管理员级服务、计划任务或防火墙规则。
 
-- **登录后持续运行**：登录 Windows 后调用既有启动器，以无浏览器方式保持监控服务运行。
-- **随 cc-switch 启动**：登录后只启动轻量监听器；它连续两次检测到 `cc-switch.exe` 已启动后，才调用既有启动器启动监控服务。
+- **登录后持续运行**：登录 Windows 后由 `wscript.exe` 无窗口调用既有启动器，以无浏览器方式保持监控服务运行。
+- **随 cc-switch 启动**：登录后无窗口启动轻量监听器；它连续两次检测到 `cc-switch.exe` 已启动后，才调用既有启动器启动监控服务。
 - 关闭开关会移除上述当前用户启动项。该功能仅支持 Windows；非 Windows 服务端会如实显示为不可用。
+
+旧版本直接启动 `node.exe` 的 APIMonitor 自有启动项会在后端下次启动时自动迁移为无窗口格式；无法识别的同名启动项不会被覆盖。
 
 ## 数据来源
 
